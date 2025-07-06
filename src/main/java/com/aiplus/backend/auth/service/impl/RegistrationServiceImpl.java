@@ -7,6 +7,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.aiplus.backend.auth.dto.RegisterRequest;
 import com.aiplus.backend.auth.dto.RegisterResponse;
+import com.aiplus.backend.auth.exceptions.InvalidRoleException;
 import com.aiplus.backend.auth.service.RegistrationService;
 import com.aiplus.backend.users.model.Role;
 import com.aiplus.backend.users.model.User;
@@ -35,7 +36,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         try {
             user.setRole(Role.valueOf(request.getRole().toUpperCase()));
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role specified");
+            throw new InvalidRoleException(request.getRole());
         }
 
         userRepository.save(user);

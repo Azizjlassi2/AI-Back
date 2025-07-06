@@ -1,11 +1,12 @@
 package com.aiplus.backend.auth.service.impl;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.aiplus.backend.auth.dto.PasswordResetRequest;
+import com.aiplus.backend.auth.exceptions.ExpiredTokenException;
+import com.aiplus.backend.auth.exceptions.InvalidTokenException;
+import com.aiplus.backend.auth.exceptions.UserNotFoundException;
 import com.aiplus.backend.auth.model.PasswordResetToken;
 import com.aiplus.backend.auth.repository.PasswordResetTokenRepository;
 import com.aiplus.backend.auth.service.PasswordResetService;
@@ -32,7 +33,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     public void initiateReset(String email) {
         User user = userRepository.findByEmail(email);
         if (user == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+            throw new UserNotFoundException("User not found");
         }
 
         tokenRepository.deleteByUser(user);
@@ -47,10 +48,10 @@ public class PasswordResetServiceImpl implements PasswordResetService {
     @Override
     public void resetPassword(PasswordResetRequest request) {
         PasswordResetToken token = tokenRepository.findByToken(request.getToken())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid token"));
+                .orElseThrow(() -> new InvalidTokenException("Invalid token"));
 
         if (token.isExpired()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Token expired");
+            throw new ExpiredTokenException("Token expired");
         }
 
         User user = token.getUser();

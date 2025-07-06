@@ -1,7 +1,6 @@
 package com.aiplus.backend.users.controller;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,79 +20,66 @@ import com.aiplus.backend.users.exceptions.UserNotFoundException;
 import com.aiplus.backend.users.mapper.UserMapper;
 import com.aiplus.backend.users.model.User;
 import com.aiplus.backend.users.service.UserService;
+import com.aiplus.backend.utils.responses.ApiResponse;
+import com.aiplus.backend.utils.responses.ResponseUtil;
 
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/v1/users")
+@RequiredArgsConstructor
 public class UserController {
+
     private final UserService userService;
     private final UserMapper userMapper;
 
-    public UserController(UserService userService, UserMapper userMapper) {
-        this.userService = userService;
-        this.userMapper = userMapper;
-    }
-
-    // getAllUsers
     @GetMapping
-    public ResponseEntity<List<UserDto>> getAllUsers() {
-        List<User> users = userService.getAllUsers();
-        List<UserDto> userDtos = users.stream()
+    public ResponseEntity<ApiResponse<List<UserDto>>> getAllUsers() {
+        List<UserDto> dtos = userService.getAllUsers().stream()
                 .map(userMapper::toDto)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(userDtos);
+                .toList();
+        return ResponseEntity.ok(ResponseUtil.success("Users fetched", dtos));
     }
 
-    // getUserById
     @GetMapping("/{id}")
-    public ResponseEntity<UserDto> getUserById(@PathVariable Long id) {
-        User user = userService.findById(id);
-        UserDto userDto = userMapper.toDto(user);
-        return ResponseEntity.ok(userDto);
+    public ResponseEntity<ApiResponse<UserDto>> getUserById(@PathVariable Long id) {
+        UserDto dto = userMapper.toDto(userService.findById(id));
+        return ResponseEntity.ok(ResponseUtil.success("User found", dto));
     }
 
-    // createUser
     @PostMapping
-    public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserDto userDto) {
+    public ResponseEntity<ApiResponse<UserDto>> createUser(@Valid @RequestBody UserDto userDto) {
         if (userService.existsByEmail(userDto.getEmail())) {
             throw new EmailAlreadyUsedException(userDto.getEmail());
-            // UserDto has @Data annotation
         }
-        User createdUser = userService.save(userMapper.toEntity(userDto));
-        UserDto createdUserDto = userMapper.toDto(createdUser);
-        return ResponseEntity.status(HttpStatus.CREATED).body(createdUserDto);
+        UserDto created = userMapper.toDto(
+                userService.save(userMapper.toEntity(userDto)));
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ResponseUtil.success("User created", created));
     }
 
-    // updateUser
     @PutMapping("/{id}")
-    public ResponseEntity<UserDto> updateUser(@PathVariable Long id, @RequestBody UserDto userDto) {
-        if (userService.findById(id) == null) {
-            throw new UserNotFoundException(id);
-        }
-        User updatedUser = userService.updateUser(id, userMapper.toEntity(userDto));
-        UserDto updatedUserDto = userMapper.toDto(updatedUser);
-        return ResponseEntity.ok(updatedUserDto);
+    public ResponseEntity<ApiResponse<UserDto>> updateUser(@PathVariable Long id,
+            @Valid @RequestBody UserDto userDto) {
+        UserDto updated = userMapper.toDto(
+                userService.updateUser(id, userMapper.toEntity(userDto)));
+        return ResponseEntity.ok(ResponseUtil.success("User updated", updated));
     }
 
-    // deleteUser
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        if (userService.findById(id) == null) {
-            throw new UserNotFoundException(id);
-        }
+    public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ResponseUtil.success("User deleted", null));
     }
 
-    // getUserByEmail
     @GetMapping("/email")
-    public ResponseEntity<UserDto> getUserByEmail(@RequestParam String email) {
+    public ResponseEntity<ApiResponse<UserDto>> getUserByEmail(@RequestParam String email) {
         User user = userService.findByEmail(email);
-        if (user == null) {
+        if (user == null)
             throw new UserNotFoundException("User with email " + email + " not found");
-        }
-        UserDto userDto = userMapper.toDto(user);
-        return ResponseEntity.ok(userDto);
+        return ResponseEntity.ok(
+                ResponseUtil.success("User found", userMapper.toDto(user)));
     }
 }
