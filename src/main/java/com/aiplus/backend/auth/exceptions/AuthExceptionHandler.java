@@ -22,7 +22,7 @@ public class AuthExceptionHandler extends ResponseEntityExceptionHandler {
             InvalidTokenException.class,
             ExpiredTokenException.class
     })
-    protected ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
+    protected ResponseEntity<ApiError> handleNotFound(UserNotFoundException ex) {
         return buildApiError(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
     }
 
@@ -39,11 +39,6 @@ public class AuthExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(InvalidRoleException.class)
     protected ResponseEntity<ApiError> handleBadRequest(InvalidRoleException ex) {
         return buildApiError(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
-    }
-
-    @ExceptionHandler(Exception.class)
-    protected ResponseEntity<ApiError> handleAll(Exception ex) {
-        return buildApiError(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", "An unexpected error occurred");
     }
 
     private ResponseEntity<ApiError> buildApiError(HttpStatus status, String error, String message) {

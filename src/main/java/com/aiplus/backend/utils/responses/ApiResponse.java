@@ -28,5 +28,10 @@ public class ApiResponse<T> {
         this.metadata = metadata;
     }
 
-    // Getters and setters...
+    public ApiResponse(boolean success, String message, T data) {
+        this.success = success;
+        this.message = message;
+        this.data = data;
+    }
+
 }

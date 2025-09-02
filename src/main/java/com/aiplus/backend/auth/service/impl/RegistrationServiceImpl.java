@@ -11,7 +11,7 @@ import com.aiplus.backend.auth.exceptions.InvalidRoleException;
 import com.aiplus.backend.auth.service.RegistrationService;
 import com.aiplus.backend.users.model.Role;
 import com.aiplus.backend.users.model.User;
-import com.aiplus.backend.users.repository.UserRepository;
+import com.aiplus.backend.users.service.UserService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -19,12 +19,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class RegistrationServiceImpl implements RegistrationService {
 
-    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserService userService;
 
     @Override
     public RegisterResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userService.existsByEmail(request.getEmail())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
         }
 
@@ -39,7 +39,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             throw new InvalidRoleException(request.getRole());
         }
 
-        userRepository.save(user);
+        userService.saveUser(user);
         return new RegisterResponse("User registered successfully", user.getEmail());
     }
 }

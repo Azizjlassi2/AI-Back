@@ -1,4 +1,4 @@
-package com.aiplus.backend.auth.config;
+package com.aiplus.backend.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,22 +33,28 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .cors(cors -> {
-                })
-                .csrf(csrf -> csrf.disable())
+        http.cors(cors -> {
+        }).csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/logout").authenticated()
-                        .requestMatchers("/api/v1/auth/login").permitAll()
-                        .requestMatchers("/api/v1/auth/register").permitAll()
-                        .requestMatchers("/api/v1/auth/forgot-password").permitAll()
+                .authorizeHttpRequests(auth -> auth.requestMatchers("/api/v1/auth/logout").authenticated()
+                        .requestMatchers("/api/v1/auth/login").permitAll().requestMatchers("/api/v1/auth/register")
+                        .permitAll().requestMatchers("/api/v1/auth/forgot-password").permitAll()
                         .requestMatchers("/api/v1/auth/forgot-password/reset").permitAll()
-                        .requestMatchers("/api/v1/auth/reset-password").authenticated()
-                        .requestMatchers("/api/v1/categories").permitAll()
-                        .requestMatchers("/api/v1/models").permitAll()
-                        .requestMatchers("/api/v1/contact/us").authenticated()
-                        .requestMatchers("/api/v1/models/publish").hasRole("DEVELOPER")
+                        .requestMatchers("/api/v1/auth/reset-password").permitAll()
+                        .requestMatchers("/api/v1/auth/update-password").authenticated()
+
+                        .requestMatchers("/api/v1/favorites/models").authenticated()
+                        .requestMatchers("/api/v1/favorites/models/*").authenticated()
+
+                        .requestMatchers("/api/v1/users").permitAll()
+
+                        .requestMatchers("/api/v1/users/*").permitAll() // only for debugging
+
+                        .requestMatchers("/api/v1/tasks").permitAll().requestMatchers("/api/v1/models").permitAll()
+                        .requestMatchers("/api/v1/models/{id}").permitAll()
+                        .requestMatchers("/api/v1/models/developer/{id}").permitAll()
+                        .requestMatchers("/api/v1/contact/us").authenticated().requestMatchers("/api/v1/models/publish")
+                        .hasRole("DEVELOPER")
 
                         .anyRequest().authenticated());
 

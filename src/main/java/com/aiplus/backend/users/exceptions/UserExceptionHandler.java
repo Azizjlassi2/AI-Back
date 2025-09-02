@@ -27,5 +27,11 @@ public class UserExceptionHandler extends ResponseEntityExceptionHandler {
         return new ResponseEntity<>(err, HttpStatus.CONFLICT);
     }
 
-    // other exception handlers...
+    @ExceptionHandler(NotLoggedInException.class)
+    protected ResponseEntity<ApiError> handleNotLoggedIn(NotLoggedInException ex) {
+        ApiError err = new ApiError(HttpStatus.FORBIDDEN.value(),
+                "Not Logged In", ex.getMessage(), List.of());
+        return new ResponseEntity<>(err, HttpStatus.FORBIDDEN);
+    }
+
 }
