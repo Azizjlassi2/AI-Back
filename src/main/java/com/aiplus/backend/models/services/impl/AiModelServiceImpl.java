@@ -92,6 +92,8 @@ public class AiModelServiceImpl implements AiModelService {
     @Cacheable("models_all")
     @Override
     public Page<AiModelSummaryDto> getAllModels(Pageable pageable) {
+        System.out.println("Fetching all public models with pagination: " + pageable);
+        System.out.println(modelRepo.findByVisibility(Visibility.PUBLIC, pageable));
         return modelRepo.findByVisibility(Visibility.PUBLIC, pageable).map(modelMapper::toSummaryDto);
     }
 
@@ -100,13 +102,19 @@ public class AiModelServiceImpl implements AiModelService {
      */
     @Override
     public AiModelDto createModel(User user, AiModelCreateDto dto) {
+        System.out.println("Creating model with name: " + dto.getName());
+        System.out.println("DTO Details: " + dto);
 
         if (modelRepo.existsByName(dto.getName())) {
             throw new AiModelNameAlreadyExistsException(dto.getName());
         }
+
         DeveloperAccount developerAccount = (DeveloperAccount) accountService.findByUser(user);
+
         String dockerPat = developerAccount.getDockerPat();
         String dockerUsername = developerAccount.getDockerUsername();
+        System.out.println("Docker Username: " + dockerUsername);
+        System.out.println("Docker PAT: " + (dockerPat != null ? "******" : "null"));
 
         // checks if the docker image exists
         if (!dockerImageVerifier.existsImage(dockerUsername, dockerPat, dto.getImage())) {
@@ -160,6 +168,9 @@ public class AiModelServiceImpl implements AiModelService {
         return modelMapper.toSummaryDtoList(modelRepo.findByDeveloperAccountId(developerId));
     }
 
+    /**
+     * Updates an existing AI model.
+     */
     @Transactional(rollbackFor = Exception.class)
     @CachePut(value = "models_all")
     @Override
@@ -208,6 +219,9 @@ public class AiModelServiceImpl implements AiModelService {
 
     }
 
+    /**
+     * Deletes an AI model by its ID.
+     */
     @CacheEvict(value = "models_all")
     @Override
     @Transactional
@@ -225,6 +239,9 @@ public class AiModelServiceImpl implements AiModelService {
         logger.log(Level.INFO, "AI model with ID {0} deleted successfully", id);
     }
 
+    /**
+     * Searches for AI models by name.
+     */
     @Override
     public List<AiModelSummaryDto> getModelsByName(String name) {
         logger.log(Level.INFO, "Searching AI models by name: {0}", name);
@@ -235,6 +252,9 @@ public class AiModelServiceImpl implements AiModelService {
         return modelMapper.toSummaryDtoList(modelRepo.findByNameContainingIgnoreCase(name));
     }
 
+    /**
+     * Fetches AI models developed by a specific user.
+     */
     @Override
     public List<AiModelDto> getDeveloperModels(User user) {
 

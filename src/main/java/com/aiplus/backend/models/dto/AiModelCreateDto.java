@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.aiplus.backend.endpoints.dto.EndpointDto;
 import com.aiplus.backend.models.model.Visibility;
-import com.aiplus.backend.subscriptions.dto.SubscriptionPlanDto;
+import com.aiplus.backend.subscriptionPlans.dto.SubscriptionPlanDto;
 
 import lombok.Data;
 

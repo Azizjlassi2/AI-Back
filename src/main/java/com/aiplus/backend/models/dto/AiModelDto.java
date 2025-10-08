@@ -8,7 +8,7 @@ import org.springframework.data.annotation.ReadOnlyProperty;
 import com.aiplus.backend.comments.dto.ModelCommentDto;
 import com.aiplus.backend.endpoints.dto.EndpointDto;
 import com.aiplus.backend.models.model.Visibility;
-import com.aiplus.backend.subscriptions.dto.SubscriptionPlanDto;
+import com.aiplus.backend.subscriptionPlans.dto.SubscriptionPlanDto;
 import com.aiplus.backend.users.dto.UserSummaryDto;
 
 import jakarta.validation.constraints.NotEmpty;

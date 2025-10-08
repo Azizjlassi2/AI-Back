@@ -1,12 +1,12 @@
-package com.aiplus.backend.subscriptions.mapper;
+package com.aiplus.backend.subscriptionPlans.mapper;
 
 import java.util.List;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-import com.aiplus.backend.subscriptions.dto.SubscriptionPlanDto;
-import com.aiplus.backend.subscriptions.model.SubscriptionPlan;
+import com.aiplus.backend.subscriptionPlans.dto.SubscriptionPlanDto;
+import com.aiplus.backend.subscriptionPlans.model.SubscriptionPlan;
 
 @Mapper(componentModel = "spring")
 public interface SubscriptionPlanMapper {

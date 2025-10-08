@@ -25,6 +25,12 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Represents a user in the system with authentication and authorization
+ * details. Implements UserDetails for Spring Security integration. Includes
+ * fields for email, password, name, role, timestamps, and associated account.
+ * 
+ */
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @Data

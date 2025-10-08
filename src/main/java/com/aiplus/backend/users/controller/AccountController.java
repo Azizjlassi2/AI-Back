@@ -16,6 +16,7 @@ import com.aiplus.backend.users.service.AccountService;
 import com.aiplus.backend.utils.responses.ApiResponse;
 import com.aiplus.backend.utils.responses.ResponseUtil;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -35,7 +36,7 @@ public class AccountController {
      */
     @PutMapping
     public ResponseEntity<ApiResponse<AccountDto>> updateAccount(@AuthenticationPrincipal User user,
-            @RequestBody AccountUpdateRequest request) {
+            @Valid @RequestBody AccountUpdateRequest request) {
 
         AccountDto dto = accountMapper.toAccountDto(accountService.updateAccount(user, request));
         return ResponseEntity.ok(ResponseUtil.success("Account Updated", dto, null));

@@ -38,14 +38,21 @@ public class ClientAccountUpdateStrategy implements AccountUpdateStrategy {
      * @return the updated Client account
      */
     @Override
+
     public ClientAccount update(User user, AccountUpdateRequest request) {
-        throw new UnsupportedOperationException("Client account updates are not fully implemented yet.");
-        /*
-         * ClientAccountUpdateRequest req = (ClientAccountUpdateRequest) request;
-         * ClientAccount account = (ClientAccount) user.getAccount();
-         * // update fields
-         * accountRepository.save(account);
-         * return account;
-         */
+        ClientAccountUpdateRequest req = (ClientAccountUpdateRequest) request;
+        ClientAccount account = (ClientAccount) user.getAccount();
+
+        account.setAddress(req.getAddress());
+        account.setBio(req.getBio());
+        account.setCompany(req.getCompany());
+        account.setJob_title(req.getJob_title());
+        account.setPhone_number(req.getPhone_number());
+        account.setWeb_site(req.getWeb_site());
+        account.setKonnectWalletId(req.getKonnect_wallet_id());
+
+        accountRepository.save(account);
+        return account;
+
     }
 }

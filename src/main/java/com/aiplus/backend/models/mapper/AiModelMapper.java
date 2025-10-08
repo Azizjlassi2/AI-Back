@@ -12,16 +12,11 @@ import com.aiplus.backend.models.dto.AiModelCreateDto;
 import com.aiplus.backend.models.dto.AiModelDto;
 import com.aiplus.backend.models.dto.AiModelSummaryDto;
 import com.aiplus.backend.models.model.AiModel;
-import com.aiplus.backend.subscriptions.mapper.SubscriptionPlanMapper;
+import com.aiplus.backend.subscriptionPlans.mapper.SubscriptionPlanMapper;
 import com.aiplus.backend.users.mapper.UserSummaryMapper;
 
-@Mapper(componentModel = "spring", uses = {
-        TaskMapper.class,
-        EndpointMapper.class,
-        SubscriptionPlanMapper.class,
-        ModelCommentMapper.class,
-        UserSummaryMapper.class,
-})
+@Mapper(componentModel = "spring", uses = { TaskMapper.class, EndpointMapper.class, SubscriptionPlanMapper.class,
+        ModelCommentMapper.class, UserSummaryMapper.class, })
 public interface AiModelMapper {
 
     EndpointMapper endpointMapper = Mappers.getMapper(EndpointMapper.class);

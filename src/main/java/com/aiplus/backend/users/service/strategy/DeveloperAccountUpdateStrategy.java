@@ -38,6 +38,7 @@ public class DeveloperAccountUpdateStrategy implements AccountUpdateStrategy {
      * @return the updated Developer account
      */
     @Override
+
     public DeveloperAccount update(User user, AccountUpdateRequest request) {
 
         DeveloperAccountUpdateRequest req = (DeveloperAccountUpdateRequest) request;
@@ -50,6 +51,7 @@ public class DeveloperAccountUpdateStrategy implements AccountUpdateStrategy {
         account.setGithub(req.getGithub());
         account.setLinkedin(req.getLinkedin());
         account.setPhone_number(req.getPhone_number());
+        account.setKonnectWalletId(req.getKonnect_wallet_id());
 
         // Docker Credentials
         account.setDockerUsername(req.getDockerUsername());

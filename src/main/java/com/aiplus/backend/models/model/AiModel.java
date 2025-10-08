@@ -10,7 +10,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.aiplus.backend.comments.model.ModelComment;
 import com.aiplus.backend.endpoints.model.Endpoint;
-import com.aiplus.backend.subscriptions.model.SubscriptionPlan;
+import com.aiplus.backend.subscriptionPlans.model.SubscriptionPlan;
 import com.aiplus.backend.users.model.ClientAccount;
 import com.aiplus.backend.users.model.DeveloperAccount;
 import com.aiplus.backend.utils.EncryptionUtil;
@@ -43,6 +43,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Represents an AI Model in the system. Includes details like name,
+ * description, framework, architecture, training dataset, performance metrics,
+ * and relationships to tasks, developer account, clients, endpoints,
+ * subscription plans, and comments. Implements auditing for creation and
+ * modification timestamps. Handles encryption and decryption of sensitive
+ * fields.
+ * 
+ * 
+ */
 @Entity
 @EqualsAndHashCode(exclude = { "endpoints", "subscriptionPlans", "comments", "tasks" })
 @EntityListeners(AuditingEntityListener.class)
@@ -61,9 +71,16 @@ public class AiModel {
     @Column(columnDefinition = "TEXT", length = 2048)
     private String description;
 
+    /**
+     * Transient field to hold the plain text docker image name. This field is not
+     * persisted in the database. It is used for input/output operations only.
+     */
     @Transient
     private String image;
 
+    /**
+     * the docker image name of the model in docker hub
+     */
     @Column(name = "image")
     private String docker_image;
 
@@ -77,39 +94,58 @@ public class AiModel {
     @Embedded
     private ModelStats stats;
 
+    /**
+     * Performance metrics of the model such as accuracy, precision, recall, and F1
+     * score.
+     */
     @Embedded
     private PerformanceMetrics performance;
 
+    /**
+     * Represents the tasks associated with the model. This field is used to
+     * establish a many-to-many relationship between models and tasks. The fetch
+     * type is set to EAGER to ensure that tasks are loaded immediately with the
+     * model. CascadeType.PERSIST and CascadeType.MERGE are used to propagate
+     * persistence operations from the model to its associated tasks.
+     */
     @ManyToMany(cascade = { CascadeType.PERSIST, CascadeType.MERGE }, fetch = FetchType.EAGER)
     @JoinTable(name = "model_tasks", joinColumns = @JoinColumn(name = "model_id"), inverseJoinColumns = @JoinColumn(name = "task_id"))
     @JsonManagedReference
     private List<Task> tasks = new ArrayList<>();
 
     /**
-     * ❌ Removed CascadeType.ALL ✅ A model belongs to a developer, but deleting a
-     * model should NOT delete the developer
+     * Represents the developer account that created the model. This field is used
+     * to establish a relationship between the model and its creator.
      */
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "developer_account_id")
     private DeveloperAccount developerAccount;
 
     /**
-     * ✅ Favorite models should be deleted with the client
+     * Represents the clients that have favorited the model. This field is used to
+     * establish a relationship between the model and its clients. Note: This
+     * relationship is currently not utilized in the application. It is included for
+     * potential future use cases where clients may want to favorite models.
      */
     @ManyToMany(mappedBy = "favoriteModels", cascade = CascadeType.ALL)
     @JsonIgnore
     private List<ClientAccount> clients = new ArrayList<>();
 
     /**
-     * ✅ Endpoints should be deleted with the model
+     * Represents the endpoints associated with the model. This field is used to
+     * establish a relationship between the model and its endpoints. Endpoints
+     * should be deleted if the model is deleted to maintain data integrity.
      */
     @OneToMany(mappedBy = "model", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
-
     private List<Endpoint> endpoints = new ArrayList<>();
 
     /**
-     * ✅ Subscription plans should be deleted with the model
+     * Represents the subscription plans associated with the model. This field is
+     * used to establish a relationship between the model and its subscription
+     * plans. Subscription plans should be deleted if the model is deleted to
+     * maintain data integrity.
+     * 
      */
     @OneToMany(mappedBy = "model", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference

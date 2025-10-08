@@ -34,3 +34,10 @@ build/
 .env
 
 /src/main/java/com/aiplus/backend/utils/seeders
+
+
+# Ignore kluster.ai Verify Code rules
+.github/instructions/kluster-code-verify.instructions.md
+
+
+.kluster

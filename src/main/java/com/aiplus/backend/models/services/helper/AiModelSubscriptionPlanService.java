@@ -6,10 +6,10 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.aiplus.backend.models.model.AiModel;
-import com.aiplus.backend.subscriptions.dto.SubscriptionPlanDto;
-import com.aiplus.backend.subscriptions.mapper.SubscriptionPlanMapper;
-import com.aiplus.backend.subscriptions.model.SubscriptionPlan;
-import com.aiplus.backend.subscriptions.repository.SubscriptionPlanRepository;
+import com.aiplus.backend.subscriptionPlans.dto.SubscriptionPlanDto;
+import com.aiplus.backend.subscriptionPlans.mapper.SubscriptionPlanMapper;
+import com.aiplus.backend.subscriptionPlans.model.SubscriptionPlan;
+import com.aiplus.backend.subscriptionPlans.repository.SubscriptionPlanRepository;
 
 import lombok.RequiredArgsConstructor;
 

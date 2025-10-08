@@ -15,25 +15,25 @@ public class AccountFactory {
     private static final Logger logger = Logger.getLogger(AccountFactory.class.getName());
 
     public Account createAccountForUser(User user) {
-
+        logger.info("Creating Account For User " + user.getEmail());
         switch (user.getRole().name()) {
-            case "DEVELOPER" -> {
-                DeveloperAccount developerAccount = new DeveloperAccount();
-                developerAccount.setUser(user);
-                return developerAccount;
-            }
-            case "ADMIN" -> {
-                AdminAccount adminAccount = new AdminAccount();
-                adminAccount.setUser(user);
-                return adminAccount;
-            }
-            case "CLIENT" -> {
-                ClientAccount clientAccount = new ClientAccount();
-                clientAccount.setUser(user);
-                return clientAccount;
-            }
+        case "DEVELOPER" -> {
+            DeveloperAccount developerAccount = new DeveloperAccount();
+            developerAccount.setUser(user);
+            return developerAccount;
+        }
+        case "ADMIN" -> {
+            AdminAccount adminAccount = new AdminAccount();
+            adminAccount.setUser(user);
+            return adminAccount;
+        }
+        case "CLIENT" -> {
+            ClientAccount clientAccount = new ClientAccount();
+            clientAccount.setUser(user);
+            return clientAccount;
+        }
 
-            default -> throw new IllegalArgumentException("Unknown role : " + user.getRole());
+        default -> throw new IllegalArgumentException("Unknown role : " + user.getRole());
 
         }
 

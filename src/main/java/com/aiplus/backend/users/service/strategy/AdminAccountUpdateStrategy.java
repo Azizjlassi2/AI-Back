@@ -38,6 +38,7 @@ public class AdminAccountUpdateStrategy implements AccountUpdateStrategy {
      * @return the updated Admin account
      */
     @Override
+
     public AdminAccount update(User user, AccountUpdateRequest request) {
         AdminAccount account = (AdminAccount) user.getAccount();
         // apply admin-specific updates if any
