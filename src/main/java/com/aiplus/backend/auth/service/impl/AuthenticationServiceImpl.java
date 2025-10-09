@@ -39,7 +39,6 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public LoginResponse login(LoginRequest request) {
-        log.info("Attempting login for user: {} - {}", request.getEmail(), request.getPassword());
         Authentication authentication;
         try {
             authentication = authenticationManager
