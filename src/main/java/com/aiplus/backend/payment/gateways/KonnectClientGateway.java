@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import com.aiplus.backend.config.FrontendProperties;
+
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -32,6 +34,8 @@ public class KonnectClientGateway {
 
     private final RestTemplate rest = new RestTemplate();
 
+    private final FrontendProperties frontendProperties;
+
     /**
      * Initiate a payment request to Konnect
      * 
@@ -39,7 +43,7 @@ public class KonnectClientGateway {
     public Map<String, Object> initPayment(String receiverWalletId, long amountInMillimes, String orderId,
             String webhookUrl, String description, Long modelId) {
 
-        String successUrl = "http://localhost:5173/models/checkout/" + modelId; // TODO: make configurable
+        String successUrl = frontendProperties.getUrl() + "/models/checkout/" + modelId; // TODO: make configurable
 
         String url = baseUrl + "/payments/init-payment";
         HttpHeaders headers = new HttpHeaders();
