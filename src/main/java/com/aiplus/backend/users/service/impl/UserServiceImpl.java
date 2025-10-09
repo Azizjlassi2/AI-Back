@@ -54,7 +54,7 @@ public class UserServiceImpl implements UserService {
     public User saveUser(User user) {
         log.info("Saving user with email: {}", user.getEmail());
         if (!existsByEmail(user.getEmail())) {
-            accountFactory.createAccountForUser(user);
+            user.setAccount(accountFactory.createAccountForUser(user));
             log.info("Account created for user with email: {}", user.getEmail());
         }
         log.info("User with email: {} saved successfully with account type: {}", user.getEmail(),
