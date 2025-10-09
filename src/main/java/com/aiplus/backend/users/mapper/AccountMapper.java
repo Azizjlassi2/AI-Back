@@ -12,7 +12,10 @@ import com.aiplus.backend.users.model.Account;
 import com.aiplus.backend.users.model.AdminAccount;
 import com.aiplus.backend.users.model.ClientAccount;
 import com.aiplus.backend.users.model.DeveloperAccount;
+import lombok.extern.slf4j.Slf4j;
 
+
+@Slf4j
 @Mapper(componentModel = "spring", uses = { AiModelMapper.class })
 public abstract class AccountMapper {
 
@@ -28,10 +31,13 @@ public abstract class AccountMapper {
 
     public AccountDto toAccountDto(Account account) {
         if (account instanceof DeveloperAccount developerAccount) {
+            log.info("Mapping DeveloperAccount to AccountDto");
             return toDto(developerAccount);
         } else if (account instanceof AdminAccount adminAccount) {
+            log.info("Mapping AdminAccount to AccountDto");
             return toDto(adminAccount);
         } else if (account instanceof ClientAccount clientAccount) {
+            log.info("Mapping ClientAccount to AccountDto");
             return toDto(clientAccount);
         } else {
             return null;
