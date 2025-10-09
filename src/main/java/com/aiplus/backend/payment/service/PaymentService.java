@@ -2,21 +2,27 @@ package com.aiplus.backend.payment.service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.aiplus.backend.payment.dto.KonnectWebhookData;
+import com.aiplus.backend.payment.dto.PaymentUpdateDTO;
 import com.aiplus.backend.payment.gateways.KonnectClientGateway;
 import com.aiplus.backend.payment.model.Payment;
 import com.aiplus.backend.payment.model.PaymentGateway;
 import com.aiplus.backend.payment.model.PaymentStatus;
 import com.aiplus.backend.payment.repository.PaymentRepository;
 import com.aiplus.backend.subscription.model.Subscription;
+import com.aiplus.backend.subscription.model.SubscriptionStatus;
 import com.aiplus.backend.subscription.repository.SubscriptionRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -30,6 +36,7 @@ public class PaymentService {
         private final PaymentRepository paymentRepository;
         private final SubscriptionRepository subscriptionRepository;
         private final KonnectClientGateway konnectClient;
+        private final SimpMessagingTemplate messagingTemplate; // Injected for WebSocket sends
 
         @Value("${app.webhook.url}")
         private String webhookUrl;
@@ -106,81 +113,78 @@ public class PaymentService {
         }
 
         /**
-         * Handle webhook callback (paymentRef from Konnect). - fetches Konnect payment
-         * details - if completed: mark Payment COMPLETED, apply commission, create
-         * payout to developer - if failed: mark payment FAILED
-         * 
-         * @Transactional public void processKonnectPaymentCallback(String paymentRef) {
-         *                log.info("Processing Konnect callback for ref={}",
-         *                paymentRef); Payment payment =
-         *                paymentRepository.findByGatewayTransactionId(paymentRef)
-         *                .orElseThrow(() -> new IllegalArgumentException("Payment not
-         *                found with ref: " + paymentRef));
-         * 
-         *                // Idempotency: if already completed -> nothing to do if
-         *                (payment.getStatus() == PaymentStatus.COMPLETED) {
-         *                log.info("Payment {} already COMPLETED, ignoring webhook",
-         *                payment.getId()); return; }
-         * 
-         *                // Fetch payment details from Konnect Map<String, Object> body
-         *                = konnectClient.getPaymentDetails(paymentRef); // assume the
-         *                response has a structure: { "payment": { "status":
-         *                "completed", // "amount": 12345, ... } } Map<String, Object>
-         *                paymentData = (Map<String, Object>) body.get("payment");
-         *                String status = paymentData.get("status").toString();
-         * 
-         *                if ("completed".equalsIgnoreCase(status)) { // mark payment
-         *                complete payment.setStatus(PaymentStatus.COMPLETED);
-         *                payment.setCompletedAt(LocalDateTime.now());
-         *                paymentRepository.save(payment);
-         * 
-         *                // commission calculation (10%) BigDecimal total =
-         *                payment.getAmount(); // e.g., 12.345 // Commission percent
-         *                e.g. 10 -> we compute 10% = total * 10 / 100 BigDecimal
-         *                commission =
-         *                total.multiply(PLATFORM_COMMISSION_PERCENT).divide(BigDecimal.valueOf(100),
-         *                6, RoundingMode.HALF_UP); // Net to developer BigDecimal net =
-         *                total.subtract(commission);
-         * 
-         *                log.info("Payment {} completed: total={}, commission={},
-         *                net={}", payment.getId(), total, commission, net);
-         * 
-         *                // Convert net to millimes for payout BigDecimal netMillimesBD
-         *                = net.multiply(BigDecimal.valueOf(1000)).setScale(0,
-         *                RoundingMode.HALF_UP); long netMillimes =
-         *                netMillimesBD.longValueExact();
-         * 
-         *                // Payout to developer's konnect wallet (platform pushes the
-         *                remaining) Subscription subscription =
-         *                payment.getSubscription(); DeveloperAccount dev =
-         *                subscription.getDeveloper();
-         * 
-         *                String developerWallet = dev.getKonnectWalletId(); if
-         *                (developerWallet == null || developerWallet.isEmpty()) {
-         *                log.error("Developer wallet missing for developer id={}",
-         *                dev.getId()); // Consider refund or manual handling - here we
-         *                mark paid but warn } else { String payoutOrderId = "payout-" +
-         *                payment.getOrderId(); Map<String, Object> payoutResp =
-         *                konnectClient.createPayout(developerWallet, netMillimes,
-         *                payoutOrderId, "Payout for subscription " +
-         *                subscription.getId()); log.info("Payout response: {}",
-         *                payoutResp); // Optionally store payoutRef from payoutResp
-         *                into a new Payment record of type // PAYOUT (left as exercise)
-         *                }
-         * 
-         *                // Activate subscription
-         *                subscription.setStatus(com.aiplus.backend.subscription.model.SubscriptionStatus.ACTIVE);
-         *                subscription.setStartDate(java.time.LocalDate.now()); // set
-         *                nextBillingDate according to plan.billingPeriod (out of scope
-         *                for now) subscriptionRepository.save(subscription);
-         * 
-         *                } else { // treat anything else as failed/pending
-         *                PaymentStatus newStatus =
-         *                "processing".equalsIgnoreCase(status) ?
-         *                PaymentStatus.PROCESSING : PaymentStatus.FAILED;
-         *                payment.setStatus(newStatus); paymentRepository.save(payment);
-         *                log.warn("Payment {} status updated to {}", payment.getId(),
-         *                newStatus); } }
+         * Handles Konnect webhook notification. - Fetches payment details via GET
+         * /payments/{paymentRef} - If "completed", updates Payment to COMPLETED,
+         * calculates commission, initiates transfer to developer, activates
+         * Subscription, and sends WebSocket notification to the client. - For other
+         * statuses, updates to FAILED without activation or notification.
          */
+        @Transactional
+        public void handleWebhook(KonnectWebhookData data) {
+                log.info("Handling webhook for paymentRef={}", data.getPayment_ref());
 
+                // Fetch details from Konnect
+                Map<String, Object> details = konnectClient.getPaymentDetails(data.getPayment_ref());
+                @SuppressWarnings("unchecked")
+                Map<String, Object> paymentData = (Map<String, Object>) details.get("payment");
+                String konnectStatus = (String) paymentData.get("status");
+
+                Payment payment = paymentRepository.findByGatewayTransactionId(data.getPayment_ref()).orElseThrow(
+                                () -> new RuntimeException("Payment not found for ref: " + data.getPayment_ref()));
+
+                if ("completed".equalsIgnoreCase(konnectStatus)) {
+                        payment.setStatus(PaymentStatus.COMPLETED);
+                        payment.setCompletedAt(LocalDateTime.now());
+                        paymentRepository.save(payment);
+
+                        // Process commission and transfer (90% to developer)
+                        Subscription subscription = payment.getSubscription();
+                        BigDecimal totalAmount = payment.getAmount();
+                        BigDecimal commission = totalAmount.multiply(PLATFORM_COMMISSION_PERCENT
+                                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
+                        BigDecimal developerAmount = totalAmount.subtract(commission);
+
+                        String developerWalletId = subscription.getDeveloper().getKonnectWalletId();
+                        initiateTransfer(developerWalletId, developerAmount); // Implement as per previous; assumed
+                                                                              // method
+
+                        // Activate subscription
+                        subscription.setStatus(SubscriptionStatus.ACTIVE);
+                        subscription.setStartDate(LocalDate.now());
+                        subscriptionRepository.save(subscription);
+
+                        // Send WebSocket notification to user (using email as username)
+                        String username = subscription.getClient().getEmail(); // Assuming email is username
+                        PaymentUpdateDTO update = new PaymentUpdateDTO("COMPLETED", subscription.getId(),
+                                        "Subscription activated successfully.");
+                        messagingTemplate.convertAndSendToUser(username, "/payment-updates", update);
+                        log.info("Sent WebSocket update to user={} for subscriptionId={}", username,
+                                        subscription.getId());
+                } else {
+                        payment.setStatus(PaymentStatus.FAILED);
+                        paymentRepository.save(payment);
+                        log.warn("Payment failed for ref={}", data.getPayment_ref());
+                }
+        }
+
+        /**
+         * Initiates transfer to developer's wallet after commission. - Converts amount
+         * to millimes and calls assumed Konnect /transfers endpoint.
+         */
+        private void initiateTransfer(String recipientWalletId, BigDecimal amount) {
+                BigDecimal amountInMillimesBD = amount.multiply(BigDecimal.valueOf(1000)).setScale(0,
+                                RoundingMode.HALF_UP);
+                long amountInMillimes = amountInMillimesBD.longValueExact();
+
+                // Implement Konnect transfer call (adapt based on actual API)
+                Map<String, Object> body = new HashMap<>();
+                body.put("recipientWalletId", recipientWalletId);
+                body.put("amount", amountInMillimes);
+                body.put("token", "TND");
+                body.put("description", "Developer payout after commission");
+
+                // Use restTemplate or konnectClient to POST /transfers (assumed)
+                log.info("Transferring {} millimes to developer wallet={}", amountInMillimes, recipientWalletId);
+                // Add actual API call here; throw exception on failure
+        }
 }
