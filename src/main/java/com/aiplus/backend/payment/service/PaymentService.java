@@ -40,6 +40,9 @@ public class PaymentService {
 
         @Value("${app.webhook.url}")
         private String webhookUrl;
+        @Value("${app.base.url}")
+        private String baseUrl;
+
         @Value("${konnect.platform.wallet.id}")
         private String platformWalletId;
         @Value("${app.platform.commission.percent:10}")
@@ -97,7 +100,8 @@ public class PaymentService {
                                 + "' plan. Your subscription will activate automatically once the transaction is verified.";
 
                 Map<String, Object> resp = konnectClient.initPayment(platformWalletId, amountInMillimes,
-                                payment.getOrderId(), webhookUrl, msg, subscription.getPlan().getModel().getId());
+                                payment.getOrderId(), baseUrl + webhookUrl, msg,
+                                subscription.getPlan().getModel().getId());
                 log.info("Konnect init-payment response: {}", resp);
                 log.info("--------------------------------------------------------------------\n");
                 // Expect response contains payUrl and paymentRef (names depend on Konnect)
