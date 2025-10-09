@@ -40,14 +40,14 @@ public class AuthController {
     public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody LoginRequest req) {
 
         LoginResponse resp = authenticationService.login(req);
+
         return ResponseEntity.ok(ResponseUtil.success("Login successful", resp));
     }
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<RegisterResponse>> register(@RequestBody RegisterRequest req) {
         RegisterResponse resp = registrationService.register(req);
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
+        return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ResponseUtil.success("User registered successfully", resp));
     }
 
@@ -59,8 +59,7 @@ public class AuthController {
     }
 
     @PostMapping("/reset-password")
-    public ResponseEntity<ApiResponse<Void>> resetPassword(
-            @RequestBody PasswordResetRequest req) {
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@RequestBody PasswordResetRequest req) {
         passwordResetService.resetPassword(req);
         return ResponseEntity.ok(ResponseUtil.success("Password has been reset", null));
     }

@@ -24,7 +24,9 @@ import com.aiplus.backend.users.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthenticationServiceImpl implements AuthenticationService {
@@ -37,10 +39,11 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     @Override
     public LoginResponse login(LoginRequest request) {
+        log.info("Attempting login for user: {} - {}", request.getEmail(), request.getPassword());
         Authentication authentication;
         try {
-            authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+            authentication = authenticationManager
+                    .authenticate(new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
         } catch (AuthenticationException e) {
             throw new InvalidCredentialsException("Incorrect Email or Password");
         }
@@ -48,6 +51,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         User user = userService.findByEmail(request.getEmail());
+        log.info("User logged in successfully: {}", user.getEmail());
 
         String token = jwtTokenProvider.generateToken(user.getEmail());
         RefreshToken rt = refreshTokenService.createForUser(user);
@@ -55,9 +59,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
 
         return new LoginResponse(token, rt.getToken(), expiresAt, user.getEmail(), user.getName(),
-                accountMapper.toAccountDto(user.getAccount()),
-                user.getRole().name(),
-                user.getCreatedAt(),
+                accountMapper.toAccountDto(user.getAccount()), user.getRole().name(), user.getCreatedAt(),
                 user.getUpdatedAt());
     }
 

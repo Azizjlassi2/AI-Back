@@ -6,11 +6,13 @@ import org.springframework.stereotype.Service;
 
 import com.aiplus.backend.users.exceptions.UserNotFoundException;
 import com.aiplus.backend.users.factory.AccountFactory;
-import com.aiplus.backend.users.model.Account;
 import com.aiplus.backend.users.model.User;
 import com.aiplus.backend.users.repository.UserRepository;
 import com.aiplus.backend.users.service.UserService;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class UserServiceImpl implements UserService {
 
@@ -50,11 +52,14 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User saveUser(User user) {
-
+        log.info("Saving user with email: {}", user.getEmail());
         if (!existsByEmail(user.getEmail())) {
-            Account account = accountFactory.createAccountForUser(user);
-            user.setAccount(account);
+            accountFactory.createAccountForUser(user);
+            log.info("Account created for user with email: {}", user.getEmail());
         }
+        log.info("User with email: {} saved successfully with account type: {}", user.getEmail(),
+                user.getAccount().getClass().getSimpleName());
+
         return userRepository.save(user);
     }
 

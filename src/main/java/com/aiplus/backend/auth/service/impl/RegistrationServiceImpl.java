@@ -14,7 +14,9 @@ import com.aiplus.backend.users.model.User;
 import com.aiplus.backend.users.service.UserService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RegistrationServiceImpl implements RegistrationService {
@@ -40,6 +42,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         }
 
         userService.saveUser(user);
+        log.info("User registered successfully with email: {}", user.getEmail());
         return new RegisterResponse("User registered successfully", user.getEmail());
     }
 }
