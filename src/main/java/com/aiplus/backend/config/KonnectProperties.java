@@ -1,4 +1,4 @@
-package com.aiplus.backend.utils;
+package com.aiplus.backend.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
@@ -6,8 +6,9 @@ import org.springframework.stereotype.Component;
 import lombok.Data;
 
 @Component
-@ConfigurationProperties(prefix = "frontend")
+@ConfigurationProperties(prefix = "konnect.webhook")
 @Data
-public class FrontendProperties {
+public class KonnectProperties {
     private String url;
+
 }

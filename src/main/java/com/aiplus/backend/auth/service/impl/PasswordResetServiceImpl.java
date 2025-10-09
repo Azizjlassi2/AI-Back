@@ -13,11 +13,11 @@ import com.aiplus.backend.auth.model.PasswordResetToken;
 import com.aiplus.backend.auth.repository.PasswordResetTokenRepository;
 import com.aiplus.backend.auth.service.PasswordResetService;
 import com.aiplus.backend.auth.service.PasswordResetTokenFactory;
+import com.aiplus.backend.config.FrontendProperties;
 import com.aiplus.backend.email.service.EmailService;
 import com.aiplus.backend.email.strategy.EmailType;
 import com.aiplus.backend.users.model.User;
 import com.aiplus.backend.users.service.UserService;
-import com.aiplus.backend.utils.FrontendProperties;
 
 import lombok.RequiredArgsConstructor;
 

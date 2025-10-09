@@ -27,6 +27,9 @@ public class KonnectClientGateway {
     @Value("${konnect.api.key}")
     private String apiKey;
 
+    @Value("${frontend.url}")
+    private String frontendUrl;
+
     private final RestTemplate rest = new RestTemplate();
 
     /**
