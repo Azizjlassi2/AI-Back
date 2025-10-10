@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import lombok.Data;
 
 @Component
-@ConfigurationProperties(prefix = "konnect.webhook")
+@ConfigurationProperties(prefix = "app.konnect.webhook")
 @Data
 public class KonnectProperties {
     private String url;
