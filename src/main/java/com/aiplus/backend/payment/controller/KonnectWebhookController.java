@@ -7,16 +7,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.aiplus.backend.payment.service.PaymentService;
 
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-@AllArgsConstructor
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/v1/payments/webhook")
 public class KonnectWebhookController {
 
-    private static PaymentService paymentService;
+    private final PaymentService paymentService;
 
     /**
      * Handle incoming webhook from Konnect

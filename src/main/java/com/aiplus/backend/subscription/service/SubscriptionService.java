@@ -6,7 +6,6 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import com.aiplus.backend.payment.model.PaymentStatus;
-import com.aiplus.backend.payment.repository.PaymentRepository;
 import com.aiplus.backend.payment.service.PaymentService;
 import com.aiplus.backend.subscription.dto.SubscriptionCreateDTO;
 import com.aiplus.backend.subscription.model.Subscription;
@@ -33,7 +32,6 @@ public class SubscriptionService {
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final UserRepository userRepository;
-    private final PaymentRepository paymentRepository;
     private final PaymentService paymentService;
 
     /**
