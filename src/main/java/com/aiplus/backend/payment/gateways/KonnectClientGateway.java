@@ -33,8 +33,8 @@ public class KonnectClientGateway {
     @Value("${frontend.url}")
     private String frontendUrl;
 
-    @Value("${app.base.url}")
-    private String appBaseUrl;
+    @Value("${app.konnect.webhook.url}")
+    private String konnectWebhookUrl;
 
     private final RestTemplate rest = new RestTemplate();
 
@@ -48,7 +48,6 @@ public class KonnectClientGateway {
             String description, Long modelId) {
 
         String successUrl = frontendProperties.getUrl() + "/models/checkout/" + modelId; // TODO: make configurable
-        String webhookUrl = appBaseUrl + "/api/v1/payments/webhook";
         String url = konnectApiUrl + "/payments/init-payment";
 
         HttpHeaders headers = new HttpHeaders();
@@ -61,7 +60,7 @@ public class KonnectClientGateway {
         body.put("amount", amountInMillimes); // in millimes
         body.put("orderId", orderId);
         body.put("acceptedPaymentMethods", List.of("wallet", "bank_card", "e-DINAR"));
-        body.put("webhook", webhookUrl);
+        body.put("webhook", konnectWebhookUrl);
         body.put("description", description);
         body.put("successUrl", successUrl);
 

@@ -38,7 +38,7 @@ public class PaymentService {
         private final KonnectClientGateway konnectClient;
         private final SimpMessagingTemplate messagingTemplate; // Injected for WebSocket sends
 
-        @Value("${app.webhook.url}")
+        @Value("${app.konnect.webhook.url}")
         private String webhookUrl;
         @Value("${app.base.url}")
         private String baseUrl;
