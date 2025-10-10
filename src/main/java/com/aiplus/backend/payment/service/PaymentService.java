@@ -40,6 +40,7 @@ public class PaymentService {
 
         @Value("${app.konnect.webhook.url}")
         private String webhookUrl;
+
         @Value("${app.base.url}")
         private String baseUrl;
 
