@@ -5,6 +5,10 @@ import org.springframework.stereotype.Component;
 
 import lombok.Data;
 
+/**
+ * Properties for Konnect integration. Maps to configuration properties prefixed
+ * with "konnect". Includes webhook URL and base URL for CORS configuration.
+ */
 @Component
 @Data
 public class KonnectProperties {

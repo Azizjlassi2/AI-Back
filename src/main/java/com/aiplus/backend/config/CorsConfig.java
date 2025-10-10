@@ -8,6 +8,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class CorsConfig implements WebMvcConfigurer {
 
     private final FrontendProperties frontendProperties;
+
     private final KonnectProperties konnectProperties;
 
     public CorsConfig(FrontendProperties frontendProperties, KonnectProperties konnectProperties) {
