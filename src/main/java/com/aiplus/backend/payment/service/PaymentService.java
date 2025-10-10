@@ -100,8 +100,7 @@ public class PaymentService {
                                 + "' plan. Your subscription will activate automatically once the transaction is verified.";
 
                 Map<String, Object> resp = konnectClient.initPayment(platformWalletId, amountInMillimes,
-                                payment.getOrderId(), baseUrl + webhookUrl, msg,
-                                subscription.getPlan().getModel().getId());
+                                payment.getOrderId(), msg, subscription.getPlan().getModel().getId());
                 log.info("Konnect init-payment response: {}", resp);
                 log.info("--------------------------------------------------------------------\n");
                 // Expect response contains payUrl and paymentRef (names depend on Konnect)
@@ -129,6 +128,7 @@ public class PaymentService {
 
                 // Fetch details from Konnect
                 Map<String, Object> details = konnectClient.getPaymentDetails(data.getPayment_ref());
+                log.info("Fetched payment details from Konnect: {}", details);
                 @SuppressWarnings("unchecked")
                 Map<String, Object> paymentData = (Map<String, Object>) details.get("payment");
                 String konnectStatus = (String) paymentData.get("status");

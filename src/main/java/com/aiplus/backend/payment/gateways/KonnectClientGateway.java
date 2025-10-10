@@ -25,12 +25,16 @@ import lombok.RequiredArgsConstructor;
 public class KonnectClientGateway {
 
     @Value("${konnect.api.url}")
-    private String baseUrl;
+    private String konnectApiUrl;
+
     @Value("${konnect.api.key}")
     private String apiKey;
 
     @Value("${frontend.url}")
     private String frontendUrl;
+
+    @Value("${app.base.url}")
+    private String appBaseUrl;
 
     private final RestTemplate rest = new RestTemplate();
 
@@ -41,11 +45,12 @@ public class KonnectClientGateway {
      * 
      */
     public Map<String, Object> initPayment(String receiverWalletId, long amountInMillimes, String orderId,
-            String webhookUrl, String description, Long modelId) {
+            String description, Long modelId) {
 
         String successUrl = frontendProperties.getUrl() + "/models/checkout/" + modelId; // TODO: make configurable
+        String webhookUrl = appBaseUrl + "/api/v1/payments/webhook";
+        String url = konnectApiUrl + "/payments/init-payment";
 
-        String url = baseUrl + "/payments/init-payment";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("x-api-key", apiKey);
@@ -61,6 +66,7 @@ public class KonnectClientGateway {
         body.put("successUrl", successUrl);
 
         HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, headers);
+
         ResponseEntity<Map> resp = rest.postForEntity(url, req, Map.class);
         return resp.getBody();
     }
@@ -69,7 +75,7 @@ public class KonnectClientGateway {
      * Get payment details from Konnect
      */
     public Map<String, Object> getPaymentDetails(String paymentRef) {
-        String url = baseUrl + "/payments/" + paymentRef;
+        String url = konnectApiUrl + "/payments/" + paymentRef;
         HttpHeaders headers = new HttpHeaders();
         headers.set("x-api-key", apiKey);
         HttpEntity<Void> req = new HttpEntity<>(headers);
