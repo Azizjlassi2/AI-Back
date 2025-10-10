@@ -14,7 +14,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.aiplus.backend.payment.dto.KonnectWebhookData;
 import com.aiplus.backend.payment.dto.PaymentUpdateDTO;
 import com.aiplus.backend.payment.gateways.KonnectClientGateway;
 import com.aiplus.backend.payment.model.Payment;
@@ -124,18 +123,18 @@ public class PaymentService {
          * statuses, updates to FAILED without activation or notification.
          */
         @Transactional
-        public void handleWebhook(KonnectWebhookData data) {
-                log.info("Handling webhook for paymentRef={}", data.getPayment_ref());
+        public void handleWebhook(String payment_ref) {
+                log.info("Handling webhook for paymentRef={}", payment_ref);
 
                 // Fetch details from Konnect
-                Map<String, Object> details = konnectClient.getPaymentDetails(data.getPayment_ref());
+                Map<String, Object> details = konnectClient.getPaymentDetails(payment_ref);
                 log.info("Fetched payment details from Konnect: {}", details);
                 @SuppressWarnings("unchecked")
                 Map<String, Object> paymentData = (Map<String, Object>) details.get("payment");
                 String konnectStatus = (String) paymentData.get("status");
 
-                Payment payment = paymentRepository.findByGatewayTransactionId(data.getPayment_ref()).orElseThrow(
-                                () -> new RuntimeException("Payment not found for ref: " + data.getPayment_ref()));
+                Payment payment = paymentRepository.findByGatewayTransactionId(payment_ref)
+                                .orElseThrow(() -> new RuntimeException("Payment not found for ref: " + payment_ref));
 
                 if ("completed".equalsIgnoreCase(konnectStatus)) {
                         payment.setStatus(PaymentStatus.COMPLETED);
@@ -168,7 +167,7 @@ public class PaymentService {
                 } else {
                         payment.setStatus(PaymentStatus.FAILED);
                         paymentRepository.save(payment);
-                        log.warn("Payment failed for ref={}", data.getPayment_ref());
+                        log.warn("Payment failed for ref={}", payment_ref);
                 }
         }
 

@@ -5,7 +5,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.aiplus.backend.payment.dto.KonnectWebhookData;
 import com.aiplus.backend.payment.service.PaymentService;
 
 import lombok.AllArgsConstructor;
@@ -19,10 +18,14 @@ public class KonnectWebhookController {
 
     private static PaymentService paymentService;
 
+    /**
+     * Handle incoming webhook from Konnect
+     * 
+     */
     @GetMapping
-    public void handleWebhook(@RequestParam KonnectWebhookData data) {
-        log.info("Received webhook data: {}", data);
-        paymentService.handleWebhook(data);
+    public void handleWebhook(@RequestParam String payment_ref) {
+        log.info("Received webhook data: {}", payment_ref);
+        paymentService.handleWebhook(payment_ref);
     }
 
 }
