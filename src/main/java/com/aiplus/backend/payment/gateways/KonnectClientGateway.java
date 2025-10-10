@@ -60,7 +60,7 @@ public class KonnectClientGateway {
         body.put("amount", amountInMillimes); // in millimes
         body.put("orderId", orderId);
         body.put("acceptedPaymentMethods", List.of("wallet", "bank_card", "e-DINAR"));
-        body.put("webhook", konnectWebhookUrl);
+        body.put("silentWebhook", konnectWebhookUrl);
         body.put("description", description);
         body.put("successUrl", successUrl);
 
