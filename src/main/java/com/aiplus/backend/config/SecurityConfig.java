@@ -54,9 +54,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/models/{id}").permitAll()
                         .requestMatchers("/api/v1/models/developer/{id}").permitAll()
                         .requestMatchers("/api/v1/contact/us").authenticated().requestMatchers("/api/v1/models/publish")
-                        .hasRole("DEVELOPER")
-
-                        .anyRequest().authenticated());
+                        .hasRole("DEVELOPER").requestMatchers("/api/v1/payments/webhook").permitAll().anyRequest()
+                        .authenticated());
 
         // Add JWT token filter
         http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
