@@ -47,7 +47,7 @@ public class KonnectClientGateway {
     public Map<String, Object> initPayment(String receiverWalletId, long amountInMillimes, String orderId,
             String description, Long modelId) {
 
-        String successUrl = frontendProperties.getUrl() + "/models/checkout/" + modelId; // TODO: make configurable
+        String successUrl = frontendProperties.getUrl() + "/client/subscriptions/"; // TODO: make configurable
         String url = konnectApiUrl + "/payments/init-payment";
 
         HttpHeaders headers = new HttpHeaders();
