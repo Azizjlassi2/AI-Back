@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.aiplus.backend.subscription.model.Subscription;
+import com.aiplus.backend.users.model.User;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -51,7 +52,7 @@ public class Payment {
     private Subscription subscription;
 
     @Column(nullable = false)
-    private Long userId;
+    private User user;
 
     @Column(nullable = false, precision = 10, scale = 3)
     private BigDecimal amount;

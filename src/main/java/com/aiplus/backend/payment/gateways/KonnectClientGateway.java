@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import com.aiplus.backend.config.FrontendProperties;
+import com.aiplus.backend.payment.model.Payment;
 
 import lombok.RequiredArgsConstructor;
 
@@ -44,8 +45,8 @@ public class KonnectClientGateway {
      * Initiate a payment request to Konnect
      * 
      */
-    public Map<String, Object> initPayment(String receiverWalletId, long amountInMillimes, String orderId,
-            String description, Long modelId) {
+    public Map<String, Object> initPayment(String receiverWalletId, long amountInMillimes, Payment payment,
+            String description) {
 
         String successUrl = frontendProperties.getUrl() + "/client/subscriptions/"; // TODO: make configurable
         String url = konnectApiUrl + "/payments/init-payment";
@@ -58,12 +59,15 @@ public class KonnectClientGateway {
         body.put("receiverWalletId", receiverWalletId);
         body.put("token", "TND"); // or dynamic
         body.put("amount", amountInMillimes); // in millimes
-        body.put("orderId", orderId);
+        body.put("orderId", payment.getOrderId());
         body.put("acceptedPaymentMethods", List.of("wallet", "bank_card", "e-DINAR"));
         body.put("webhook", konnectWebhookUrl);
         body.put("silentWebhook", true);
         body.put("description", description);
         body.put("successUrl", successUrl);
+
+        body.put("firstName", payment.getUser().getName());
+        body.put("email", payment.getUser().getEmail());
 
         HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, headers);
 

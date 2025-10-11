@@ -14,7 +14,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.aiplus.backend.payment.dto.PaymentUpdateDTO;
 import com.aiplus.backend.payment.gateways.KonnectClientGateway;
 import com.aiplus.backend.payment.model.Payment;
 import com.aiplus.backend.payment.model.PaymentGateway;
@@ -61,11 +60,13 @@ public class PaymentService {
                 log.info("Initiating payment for subscription id={} clientId={} planId={}", subscription.getId(),
                                 subscription.getClient().getId(), subscription.getPlan().getId());
                 log.info("--------------------------------------------------------------------\n");
+
                 // Generate unique orderId
                 String orderId = String.format("SUB-%s-%s-%s-%s-%s", subscription.getPlan().getModel().getId(),
                                 subscription.getPlan().getId(), subscription.getClient().getId(),
                                 DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now()),
                                 UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+
                 // Generate unique transactionId
                 String transactionId = String.format("TX-%s-%s-%s", PaymentGateway.KONNECT.name(),
                                 UUID.randomUUID().toString().substring(0, 8).toUpperCase(),
@@ -73,12 +74,13 @@ public class PaymentService {
 
                 // Build Payment record
                 Payment payment = Payment.builder().transactionId(transactionId).orderId(orderId)
-                                .userId(subscription.getClient().getId()).subscription(subscription)
+                                .user(subscription.getClient()).subscription(subscription)
                                 .amount(BigDecimal.valueOf(subscription.getPlan().getPrice()))
                                 .currency(subscription.getPlan().getCurrency()).gateway(PaymentGateway.KONNECT)
                                 .status(PaymentStatus.PENDING).build();
 
                 paymentRepository.save(payment);
+
                 log.info("Created payment record id={} orderId={}", payment.getId(), payment.getOrderId());
                 log.info("--------------------------------------------------------------------\n");
 
@@ -92,15 +94,15 @@ public class PaymentService {
 
                 log.info("Initiating Konnect payment for amount={} millimes, orderId={}, userId={}", amountInMillimes,
 
-                                payment.getOrderId(), payment.getUserId());
+                                payment.getOrderId(), payment.getUser().getId());
                 log.info("--------------------------------------------------------------------\n");
                 // Call Konnect init-payment
                 String msg = "Payment initiated for the '" + subscription.getPlan().getModel().getName() + " - "
                                 + subscription.getPlan().getName()
                                 + "' plan. Your subscription will activate automatically once the transaction is verified.";
 
-                Map<String, Object> resp = konnectClient.initPayment(platformWalletId, amountInMillimes,
-                                payment.getOrderId(), msg, subscription.getPlan().getModel().getId());
+                Map<String, Object> resp = konnectClient.initPayment(platformWalletId, amountInMillimes, payment, msg);
+
                 log.info("Konnect init-payment response: {}", resp);
                 log.info("--------------------------------------------------------------------\n");
                 // Expect response contains payUrl and paymentRef (names depend on Konnect)
@@ -129,8 +131,10 @@ public class PaymentService {
                 // Fetch details from Konnect
                 Map<String, Object> details = konnectClient.getPaymentDetails(payment_ref);
                 log.info("Fetched payment details from Konnect: {}", details);
+
                 @SuppressWarnings("unchecked")
                 Map<String, Object> paymentData = (Map<String, Object>) details.get("payment");
+
                 String konnectStatus = (String) paymentData.get("status");
 
                 Payment payment = paymentRepository.findByGatewayTransactionId(payment_ref)
@@ -156,14 +160,18 @@ public class PaymentService {
                         subscription.setStatus(SubscriptionStatus.ACTIVE);
                         subscription.setStartDate(LocalDate.now());
                         subscriptionRepository.save(subscription);
-
-                        // Send WebSocket notification to user (using email as username)
-                        String username = subscription.getClient().getEmail(); // Assuming email is username
-                        PaymentUpdateDTO update = new PaymentUpdateDTO("COMPLETED", subscription.getId(),
-                                        "Subscription activated successfully.");
-                        messagingTemplate.convertAndSendToUser(username, "/payment-updates", update);
-                        log.info("Sent WebSocket update to user={} for subscriptionId={}", username,
-                                        subscription.getId());
+                        /*
+                         * // Send WebSocket notification to user (using email as username) String
+                         * username = subscription.getClient().getEmail(); // Assuming email is username
+                         * 
+                         * PaymentUpdateDTO update = new PaymentUpdateDTO("COMPLETED",
+                         * subscription.getId(), "Subscription activated successfully.");
+                         * 
+                         * messagingTemplate.convertAndSendToUser(username, "/payment-updates", update);
+                         * 
+                         * log.info("Sent WebSocket update to user={} for subscriptionId={}", username,
+                         * subscription.getId());
+                         */
                 } else {
                         payment.setStatus(PaymentStatus.FAILED);
                         paymentRepository.save(payment);
@@ -176,6 +184,7 @@ public class PaymentService {
          * to millimes and calls assumed Konnect /transfers endpoint.
          */
         private void initiateTransfer(String recipientWalletId, BigDecimal amount) {
+
                 BigDecimal amountInMillimesBD = amount.multiply(BigDecimal.valueOf(1000)).setScale(0,
                                 RoundingMode.HALF_UP);
                 long amountInMillimes = amountInMillimesBD.longValueExact();
@@ -187,8 +196,9 @@ public class PaymentService {
                 body.put("token", "TND");
                 body.put("description", "Developer payout after commission");
 
-                // Use restTemplate or konnectClient to POST /transfers (assumed)
                 log.info("Transferring {} millimes to developer wallet={}", amountInMillimes, recipientWalletId);
                 // Add actual API call here; throw exception on failure
+                // use KonnectClient to make the transfer call
+
         }
 }
