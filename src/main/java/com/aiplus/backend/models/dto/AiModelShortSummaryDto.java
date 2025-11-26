@@ -1,24 +1,16 @@
 package com.aiplus.backend.models.dto;
 
 import java.time.LocalDate;
-import java.util.List;
-
-import com.aiplus.backend.users.dto.UserSummaryDto;
 
 import lombok.Builder;
 import lombok.Data;
 
 @Data
 @Builder
-public class AiModelSummaryDto {
+public class AiModelShortSummaryDto {
     private Long id;
     private String name;
     private String description;
-
-    private UserSummaryDto developer;
-    private List<TaskDto> tasks;
-    private ModelStatsDto stats;
-
     private LocalDate createdAt;
 
 }

@@ -5,10 +5,16 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import com.aiplus.backend.models.model.AiModel;
 import com.aiplus.backend.models.model.Visibility;
 
+/**
+ * Repository interface for AI models. Extends JpaRepository to provide CRUD
+ * operations and custom query methods for AI models.
+ */
+@Repository
 public interface AiModelRepository extends JpaRepository<AiModel, Long> {
 
     List<AiModel> findByDeveloperAccountId(Long developerId);

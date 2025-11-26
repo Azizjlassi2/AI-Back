@@ -5,24 +5,31 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.aiplus.backend.config.FrontendProperties;
+import com.aiplus.backend.payment.dto.KonnectPaymentInitRequest;
+import com.aiplus.backend.payment.dto.KonnectPaymentInitResponse;
+import com.aiplus.backend.payment.dto.PaymentUpdateDTO;
 import com.aiplus.backend.payment.gateways.KonnectClientGateway;
 import com.aiplus.backend.payment.model.Payment;
 import com.aiplus.backend.payment.model.PaymentGateway;
 import com.aiplus.backend.payment.model.PaymentStatus;
 import com.aiplus.backend.payment.repository.PaymentRepository;
+import com.aiplus.backend.subscription.dto.SubscriptionCreateDTO;
 import com.aiplus.backend.subscription.model.Subscription;
 import com.aiplus.backend.subscription.model.SubscriptionStatus;
 import com.aiplus.backend.subscription.repository.SubscriptionRepository;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,171 +41,258 @@ public class PaymentService {
         private final PaymentRepository paymentRepository;
         private final SubscriptionRepository subscriptionRepository;
         private final KonnectClientGateway konnectClient;
-        private final SimpMessagingTemplate messagingTemplate; // Injected for WebSocket sends
+        private final SimpMessagingTemplate messagingTemplate;
+        private final FrontendProperties frontendProperties;
 
         @Value("${app.konnect.webhook.url}")
-        private String webhookUrl;
+        private String konnectWebhookUrl;
 
         @Value("${app.base.url}")
         private String baseUrl;
 
-        @Value("${konnect.platform.wallet.id}")
-        private String platformWalletId;
-        @Value("${app.platform.commission.percent:10}")
-        private BigDecimal PLATFORM_COMMISSION_PERCENT; // 10 by default
+        /**
+         * Retries the given API call with exponential backoff.
+         * 
+         * @param apiCall     the API call to retry
+         * @param maxAttempts maximum number of attempts
+         * @return the result of the API call
+         * @throws Exception if all attempts fail
+         */
+        private <T> T retry(Supplier<T> apiCall, int maxAttempts) {
+                int attempt = 1;
+                while (true) {
+                        try {
+                                return apiCall.get();
+                        } catch (Exception e) {
+                                if (attempt >= maxAttempts) {
+                                        throw e;
+                                }
+                                long backoff = (long) Math.pow(2, attempt) * 1000;
+                                log.warn("API call failed on attempt {}, retrying after {} ms", attempt, backoff, e);
+                                try {
+                                        Thread.sleep(backoff);
+                                } catch (InterruptedException ie) {
+                                        Thread.currentThread().interrupt();
+                                        throw new RuntimeException(ie);
+                                }
+                                attempt++;
+                        }
+                }
+        }
 
         /**
-         * Initiate payment for a subscription. - creates Payment (PENDING) - calls
-         * Konnect /payments/init-payment with receiverWalletId = platformWalletId -
-         * updates Payment.gatewayTransactionId and sets status PROCESSING - returns
-         * payUrl (redirect target for frontend)
+         * Builds the Konnect payment initiation request with all required fields.
          */
-        @Transactional
-        public String initiatePaymentForSubscription(Subscription subscription) {
-                log.info("--------------------------------------------------------------------\n");
+        private KonnectPaymentInitRequest buildKonnectRequest(Payment payment, Long amountInMillimes,
+                        Subscription subscription, SubscriptionCreateDTO dto) {
 
-                log.info("Initiating payment for subscription id={} clientId={} planId={}", subscription.getId(),
-                                subscription.getClient().getId(), subscription.getPlan().getId());
-                log.info("--------------------------------------------------------------------\n");
+                String description = buildPaymentDescription(subscription);
+                String successUrl = frontendProperties.getUrl() + "/#/client/payment-confirmation";
+                String failureUrl = frontendProperties.getUrl() + "/#/client/payment-error/";
 
-                // Generate unique orderId
-                String orderId = String.format("SUB-%s-%s-%s-%s-%s", subscription.getPlan().getModel().getId(),
-                                subscription.getPlan().getId(), subscription.getClient().getId(),
-                                DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now()),
-                                UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+                return KonnectPaymentInitRequest.builder()
+                                .receiverWalletId(subscription.getPlan().getModel().getDeveloperAccount()
+                                                .getKonnectWalletId())
+                                .token("TND").amount(amountInMillimes).orderId(payment.getOrderId())
+                                .acceptedPaymentMethods(List.of("wallet", "bank_card", "e-DINAR"))
+                                .webhook(konnectWebhookUrl).silentWebhook(true).description(description)
+                                .successUrl(successUrl).failUrl(failureUrl).firstName(dto.getFirstName())
+                                .lastName(dto.getLastName()).email(dto.getEmail()).phoneNumber(dto.getPhoneNumber())
+                                .build();
+        }
 
-                // Generate unique transactionId
-                String transactionId = String.format("TX-%s-%s-%s", PaymentGateway.KONNECT.name(),
-                                UUID.randomUUID().toString().substring(0, 8).toUpperCase(),
-                                DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now()));
+        /**
+         * Creates a Payment record in PENDING status for the given subscription.
+         */
+        private Payment createPaymentRecord(Subscription subscription) {
+                String orderId = generateOrderId(subscription);
+                String transactionId = generateTransactionId();
 
-                // Build Payment record
                 Payment payment = Payment.builder().transactionId(transactionId).orderId(orderId)
                                 .user(subscription.getClient()).subscription(subscription)
                                 .amount(BigDecimal.valueOf(subscription.getPlan().getPrice()))
                                 .currency(subscription.getPlan().getCurrency()).gateway(PaymentGateway.KONNECT)
                                 .status(PaymentStatus.PENDING).build();
 
-                paymentRepository.save(payment);
-
-                log.info("Created payment record id={} orderId={}", payment.getId(), payment.getOrderId());
-                log.info("--------------------------------------------------------------------\n");
-
-                log.info("Converting amount {} {} to millimes for Konnect", payment.getAmount(), payment.getCurrency());
-                // Convert price to millimes (digit-by-digit care)
-                // Example: price = 12.345 (TND) => millimes = price * 1000 = 12345
-                BigDecimal price = payment.getAmount();
-                BigDecimal multiplier = new BigDecimal(1000); // 1 TND = 1000 millimes
-                BigDecimal amountInMillimesBD = price.multiply(multiplier).setScale(0, RoundingMode.HALF_UP);
-                long amountInMillimes = amountInMillimesBD.longValueExact();
-
-                log.info("Initiating Konnect payment for amount={} millimes, orderId={}, userId={}", amountInMillimes,
-
-                                payment.getOrderId(), payment.getUser().getId());
-                log.info("--------------------------------------------------------------------\n");
-                // Call Konnect init-payment
-                String msg = "Payment initiated for the '" + subscription.getPlan().getModel().getName() + " - "
-                                + subscription.getPlan().getName()
-                                + "' plan. Your subscription will activate automatically once the transaction is verified.";
-
-                Map<String, Object> resp = konnectClient.initPayment(platformWalletId, amountInMillimes, payment, msg);
-
-                log.info("Konnect init-payment response: {}", resp);
-                log.info("--------------------------------------------------------------------\n");
-                // Expect response contains payUrl and paymentRef (names depend on Konnect)
-                String payUrl = (String) resp.get("payUrl");
-                String paymentRef = (String) resp.get("paymentRef");
-
-                payment.setGatewayTransactionId(paymentRef);
-                payment.setStatus(PaymentStatus.PROCESSING);
-                paymentRepository.save(payment);
-
-                log.info("Initiated Konnect payment paymentRef={} for paymentId={}", paymentRef, payment.getId());
-                return payUrl;
+                return paymentRepository.save(payment);
         }
 
         /**
-         * Handles Konnect webhook notification. - Fetches payment details via GET
-         * /payments/{paymentRef} - If "completed", updates Payment to COMPLETED,
-         * calculates commission, initiates transfer to developer, activates
-         * Subscription, and sends WebSocket notification to the client. - For other
-         * statuses, updates to FAILED without activation or notification.
+         * Generates a unique order ID for the payment based on subscription details.
+         */
+        private String generateOrderId(Subscription subscription) {
+                return String.format("SUB-%s-%s-%s-%s-%s", subscription.getPlan().getModel().getId(),
+                                subscription.getPlan().getId(), subscription.getClient().getId(),
+                                DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now()),
+                                UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+        }
+
+        /**
+         * Generates a unique transaction ID for the payment.
+         */
+        private String generateTransactionId() {
+                return String.format("TX-%s-%s-%s", PaymentGateway.KONNECT.name(),
+                                UUID.randomUUID().toString().substring(0, 8).toUpperCase(),
+                                DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(LocalDateTime.now()));
+        }
+
+        /**
+         * Builds a user-friendly payment description for Konnect.
+         */
+        private String buildPaymentDescription(Subscription subscription) {
+                return String.format("Thank you for selecting the '%s - %s' plan! "
+                                + "We're processing your payment, and your subscription will activate automatically once verified.",
+                                subscription.getPlan().getModel().getName(), subscription.getPlan().getName());
+        }
+
+        /**
+         * Converts amount in TND to millimes (1 TND = 1000 millimes).
+         */
+        private Long convertToMillimes(BigDecimal amountInTND) {
+                BigDecimal multiplier = new BigDecimal(1000);
+                BigDecimal amountInMillimesBD = amountInTND.multiply(multiplier).setScale(0, RoundingMode.HALF_UP);
+                return amountInMillimesBD.longValueExact();
+        }
+
+        /**
+         * Initiates a payment for the given subscription. - Creates a Payment record in
+         * PENDING status. - Converts amount to millimes. - Builds and sends the Konnect
+         * payment initiation request with retries. - Updates Payment status to
+         * PROCESSING upon successful initiation. - Logs all steps and errors for
+         * traceability.
          */
         @Transactional
-        public void handleWebhook(String payment_ref) {
-                log.info("Handling webhook for paymentRef={}", payment_ref);
+        public KonnectPaymentInitResponse initiatePaymentForSubscription(Subscription subscription,
+                        SubscriptionCreateDTO dto) {
+                log.info("Initiating payment for subscription id={}, clientId={}, planId={}", subscription.getId(),
+                                subscription.getClient().getId(), subscription.getPlan().getId());
 
-                // Fetch details from Konnect
-                Map<String, Object> details = konnectClient.getPaymentDetails(payment_ref);
-                log.info("Fetched payment details from Konnect: {}", details);
+                Payment payment = createPaymentRecord(subscription);
+                log.info("Created payment record id={}, orderId={}", payment.getId(), payment.getOrderId());
 
-                @SuppressWarnings("unchecked")
-                Map<String, Object> paymentData = (Map<String, Object>) details.get("payment");
+                Long amountInMillimes = convertToMillimes(payment.getAmount());
+                log.info("Converted {} {} to {} millimes", payment.getAmount(), payment.getCurrency(),
+                                amountInMillimes);
 
-                String konnectStatus = (String) paymentData.get("status");
+                KonnectPaymentInitRequest konnectRequest = buildKonnectRequest(payment, amountInMillimes, subscription,
+                                dto);
 
-                Payment payment = paymentRepository.findByGatewayTransactionId(payment_ref)
-                                .orElseThrow(() -> new RuntimeException("Payment not found for ref: " + payment_ref));
+                KonnectPaymentInitResponse response = retry(
+                                () -> (KonnectPaymentInitResponse) konnectClient.initPayment(konnectRequest), 3);
+                log.info("Konnect init-payment response: {}", response);
 
-                if ("completed".equalsIgnoreCase(konnectStatus)) {
-                        payment.setStatus(PaymentStatus.COMPLETED);
-                        payment.setCompletedAt(LocalDateTime.now());
-                        paymentRepository.save(payment);
+                payment.setStatus(PaymentStatus.PROCESSING);
+                payment.setGatewayTransactionId(response.getPaymentRef());
+                paymentRepository.save(payment);
 
-                        // Process commission and transfer (90% to developer)
-                        Subscription subscription = payment.getSubscription();
-                        BigDecimal totalAmount = payment.getAmount();
-                        BigDecimal commission = totalAmount.multiply(PLATFORM_COMMISSION_PERCENT
-                                        .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
-                        BigDecimal developerAmount = totalAmount.subtract(commission);
+                subscription.setPayment(payment);
+                subscriptionRepository.save(subscription);
 
-                        String developerWalletId = subscription.getDeveloper().getKonnectWalletId();
-                        initiateTransfer(developerWalletId, developerAmount); // Implement as per previous; assumed
-                                                                              // method
+                log.info("Initiated Konnect payment paymentRef={} for paymentId={}", response.getPaymentRef(),
+                                payment.getId());
 
-                        // Activate subscription
-                        subscription.setStatus(SubscriptionStatus.ACTIVE);
-                        subscription.setStartDate(LocalDate.now());
-                        subscriptionRepository.save(subscription);
-                        /*
-                         * // Send WebSocket notification to user (using email as username) String
-                         * username = subscription.getClient().getEmail(); // Assuming email is username
-                         * 
-                         * PaymentUpdateDTO update = new PaymentUpdateDTO("COMPLETED",
-                         * subscription.getId(), "Subscription activated successfully.");
-                         * 
-                         * messagingTemplate.convertAndSendToUser(username, "/payment-updates", update);
-                         * 
-                         * log.info("Sent WebSocket update to user={} for subscriptionId={}", username,
-                         * subscription.getId());
-                         */
-                } else {
-                        payment.setStatus(PaymentStatus.FAILED);
-                        paymentRepository.save(payment);
-                        log.warn("Payment failed for ref={}", payment_ref);
+                return response;
+        }
+
+        /**
+         * Handles the Konnect webhook to confirm payment status. - Fetches payment
+         * details from Konnect with retries. - Updates local Payment and Subscription
+         * records based on status. - Sends WebSocket notifications to the client about
+         * payment result. - Logs all steps and errors for traceability.
+         */
+        @Transactional
+        public void handleWebhook(String paymentRef) {
+                log.info("Handling webhook for paymentRef={}", paymentRef);
+
+                try {
+                        Map<String, Object> details = retry(() -> konnectClient.getPaymentDetails(paymentRef), 3);
+                        log.info("Fetched payment details from Konnect: {}", details);
+
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> paymentData = (Map<String, Object>) details.get("payment");
+                        if (paymentData == null) {
+                                throw new IllegalStateException("Payment data missing in Konnect response");
+                        }
+
+                        String konnectStatus = (String) paymentData.get("status");
+                        if (konnectStatus == null) {
+                                throw new IllegalStateException("Status missing in Konnect payment data");
+                        }
+
+                        Payment payment = paymentRepository.findByTransactionId(paymentRef).orElseThrow(
+                                        () -> new EntityNotFoundException("Payment not found for ref: " + paymentRef));
+
+                        if ("completed".equalsIgnoreCase(konnectStatus)) {
+                                updatePaymentToCompleted(payment);
+                                activateSubscription(payment.getSubscription());
+                                sendWebSocketSuccessNotification(payment.getSubscription());
+                        } else {
+                                updatePaymentToFailed(payment);
+                                sendWebSocketFailureNotification(payment.getSubscription());
+                        }
+                } catch (EntityNotFoundException e) {
+                        log.error("Entity not found during webhook handling for paymentRef={}: {}", paymentRef,
+                                        e.getMessage());
+                } catch (IllegalStateException e) {
+                        log.error("Invalid Konnect response for paymentRef={}: {}", paymentRef, e.getMessage());
+                        throw e;
+                } catch (Exception e) {
+                        log.error("Unexpected error handling webhook for paymentRef={}", paymentRef, e);
+                        throw new RuntimeException("Webhook handling failed", e);
                 }
         }
 
         /**
-         * Initiates transfer to developer's wallet after commission. - Converts amount
-         * to millimes and calls assumed Konnect /transfers endpoint.
+         * Updates the payment status to COMPLETED, sets the completion timestamp, and
+         * saves the payment.
          */
-        private void initiateTransfer(String recipientWalletId, BigDecimal amount) {
 
-                BigDecimal amountInMillimesBD = amount.multiply(BigDecimal.valueOf(1000)).setScale(0,
-                                RoundingMode.HALF_UP);
-                long amountInMillimes = amountInMillimesBD.longValueExact();
+        private void updatePaymentToCompleted(Payment payment) {
+                payment.setStatus(PaymentStatus.COMPLETED);
+                payment.setCompletedAt(LocalDateTime.now());
+                paymentRepository.save(payment);
+        }
 
-                // Implement Konnect transfer call (adapt based on actual API)
-                Map<String, Object> body = new HashMap<>();
-                body.put("recipientWalletId", recipientWalletId);
-                body.put("amount", amountInMillimes);
-                body.put("token", "TND");
-                body.put("description", "Developer payout after commission");
+        /**
+         * Updates the payment status to FAILED and logs the failure event.
+         */
+        private void updatePaymentToFailed(Payment payment) {
+                payment.setStatus(PaymentStatus.FAILED);
+                paymentRepository.save(payment);
+                log.warn("Payment failed for ref={}", payment.getTransactionId());
+        }
 
-                log.info("Transferring {} millimes to developer wallet={}", amountInMillimes, recipientWalletId);
-                // Add actual API call here; throw exception on failure
-                // use KonnectClient to make the transfer call
+        /**
+         * Activates the subscription by setting its status to ACTIVE and updating the
+         * start date.
+         */
+        private void activateSubscription(Subscription subscription) {
+                subscription.setStatus(SubscriptionStatus.ACTIVE);
+                subscription.setStartDate(LocalDate.now());
+                subscriptionRepository.save(subscription);
+        }
 
+        /**
+         * Sends a WebSocket notification to the client indicating payment success and
+         * subscription activation.
+         */
+        private void sendWebSocketSuccessNotification(Subscription subscription) {
+                String username = subscription.getClient().getUser().getEmail();
+                PaymentUpdateDTO update = new PaymentUpdateDTO("COMPLETED", subscription.getId(),
+                                "Subscription activated successfully.");
+                messagingTemplate.convertAndSendToUser(username, "/payment-updates", update);
+                log.info("Sent WebSocket update to user={} for subscriptionId={}", username, subscription.getId());
+        }
+
+        /**
+         * Sends a WebSocket notification to the client indicating payment failure.
+         */
+        private void sendWebSocketFailureNotification(Subscription subscription) {
+                String username = subscription.getClient().getUser().getEmail();
+                PaymentUpdateDTO update = new PaymentUpdateDTO("FAILED", subscription.getId(),
+                                "Payment failed. Please try again.");
+                messagingTemplate.convertAndSendToUser(username, "/payment-updates", update);
+                log.info("Sent WebSocket failure update to user={} for subscriptionId={}", username,
+                                subscription.getId());
         }
 }

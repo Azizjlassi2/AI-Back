@@ -6,9 +6,11 @@ import com.aiplus.backend.endpoints.dto.EndpointDto;
 import com.aiplus.backend.models.model.Visibility;
 import com.aiplus.backend.subscriptionPlans.dto.SubscriptionPlanDto;
 
+import lombok.Builder;
 import lombok.Data;
 
 @Data
+@Builder
 public class AiModelCreateDto {
 
     private String name;

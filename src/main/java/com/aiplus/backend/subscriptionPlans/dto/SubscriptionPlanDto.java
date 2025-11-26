@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.data.annotation.ReadOnlyProperty;
 
+import com.aiplus.backend.models.dto.AiModelShortSummaryDto;
 import com.aiplus.backend.subscriptionPlans.model.BillingPeriod;
 
 import lombok.Data;
@@ -13,9 +14,9 @@ import lombok.Data;
  */
 @Data
 public class SubscriptionPlanDto {
+
     @ReadOnlyProperty
     private Long id;
-
     private String name;
     private String description;
     private double price;
@@ -23,4 +24,5 @@ public class SubscriptionPlanDto {
     private BillingPeriod billingPeriod;
     private List<String> features;
     private Integer apiCallsLimit;
+    private AiModelShortSummaryDto model;
 }

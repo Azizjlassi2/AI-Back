@@ -1,5 +1,7 @@
 package com.aiplus.backend.subscription.dto;
 
+import com.aiplus.backend.payment.model.PaymentGateway;
+
 import lombok.Builder;
 import lombok.Data;
 
@@ -13,9 +15,15 @@ public class SubscriptionCreateDTO {
     private String modelName;
     private String planName;
 
-    private String paymentMethod;
-
+    private PaymentGateway paymentMethod;
     private Long clientId;
     private Long planId;
+
+    private String firstName;
+    private String lastName;
+    private String email;
+    private String phoneNumber;
+    private String city;
+    private String zipCode;
 
 }

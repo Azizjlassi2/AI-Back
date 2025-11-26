@@ -13,9 +13,11 @@ import com.aiplus.backend.users.dto.UserSummaryDto;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import lombok.Builder;
 import lombok.Data;
 
 @Data
+@Builder
 public class AiModelDto {
 
     @NotEmpty
@@ -31,6 +33,7 @@ public class AiModelDto {
     private String description;
 
     private Visibility visibility;
+    private String image;
 
     private String framework;
     private String architecture;

@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import com.aiplus.backend.subscription.model.Subscription;
-import com.aiplus.backend.users.model.User;
+import com.aiplus.backend.users.model.ClientAccount;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -48,31 +48,42 @@ public class Payment {
     /**
      * The subscription associated with this payment.
      */
-    @ManyToOne(optional = true)
+    @ManyToOne(optional = false)
     private Subscription subscription;
 
-    @Column(nullable = false)
-    private User user;
+    /**
+     * The user who made this payment.
+     */
+    @ManyToOne(optional = false)
+    private ClientAccount user;
 
+    /**
+     * The amount paid in the transaction.
+     */
     @Column(nullable = false, precision = 10, scale = 3)
     private BigDecimal amount;
 
+    /**
+     * The currency of the payment (TND).
+     */
     @Column(nullable = false, length = 3)
     private String currency;
 
+    /***
+     * The payment gateway used for this transaction.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentGateway gateway;
 
+    /***
+     * The status of the payment transaction.
+     */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private PaymentStatus status;
 
-    private String gatewayTransactionId;
-
-    @Column(columnDefinition = "TEXT")
-    private String metadata;
-
+    private String gatewayTransactionId; // paymentRef of Konnect
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

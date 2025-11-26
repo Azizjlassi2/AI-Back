@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.aiplus.backend.auth.dto.LoginRequest;
@@ -25,6 +24,7 @@ import com.aiplus.backend.utils.responses.ResponseUtil;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -52,8 +52,10 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<ApiResponse<Void>> forgotPassword(@RequestParam String email) {
-        passwordResetService.initiateReset(email);
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody String email) {
+        String cleanEmail = email.replace("\"", "").trim();
+        passwordResetService.initiateReset(cleanEmail);
+
         return ResponseEntity.ok(ResponseUtil.success("Password reset link sent.", null));
 
     }

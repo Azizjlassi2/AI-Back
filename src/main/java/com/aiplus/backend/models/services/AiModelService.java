@@ -10,7 +10,12 @@ import com.aiplus.backend.models.dto.AiModelDto;
 import com.aiplus.backend.models.dto.AiModelSummaryDto;
 import com.aiplus.backend.users.model.User;
 
+/**
+ * Service interface for managing AI models. Defines methods for creating,
+ * retrieving, updating, and deleting AI models.
+ */
 public interface AiModelService {
+
     Page<AiModelSummaryDto> getAllModels(Pageable pageable);
 
     AiModelDto getModelById(User developer, Long id);

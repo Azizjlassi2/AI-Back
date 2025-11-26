@@ -10,6 +10,7 @@ import com.aiplus.backend.comments.mapper.ModelCommentMapper;
 import com.aiplus.backend.endpoints.mapper.EndpointMapper;
 import com.aiplus.backend.models.dto.AiModelCreateDto;
 import com.aiplus.backend.models.dto.AiModelDto;
+import com.aiplus.backend.models.dto.AiModelShortSummaryDto;
 import com.aiplus.backend.models.dto.AiModelSummaryDto;
 import com.aiplus.backend.models.model.AiModel;
 import com.aiplus.backend.subscriptionPlans.mapper.SubscriptionPlanMapper;
@@ -55,5 +56,8 @@ public interface AiModelMapper {
     List<AiModel> toSummaryEntityList(List<AiModelSummaryDto> dtos);
 
     List<AiModel> toEntityList(List<AiModelDto> dtos);
+
+    @Mapping(source = "id", target = "id")
+    AiModelShortSummaryDto toShortSummaryDto(AiModel model);
 
 }

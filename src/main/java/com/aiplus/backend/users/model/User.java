@@ -71,6 +71,10 @@ public class User implements UserDetails {
         return email;
     }
 
+    public String getEmail() {
+        return email;
+    }
+
     @Override
     public String getPassword() {
         return password;
@@ -119,5 +123,9 @@ public class User implements UserDetails {
 
     public boolean isClient() {
         return Role.CLIENT.equals(this.getRole());
+    }
+
+    public Account getAccount() {
+        return this.account;
     }
 }

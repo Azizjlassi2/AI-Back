@@ -39,7 +39,7 @@ public class FavoriteService {
         if (userAccount != null && model != null) {
             userAccount.getFavoriteModels().add(model);
         }
-        return accountRepository.save(userAccount).getFavoriteModels();
+        return (List<AiModel>) accountRepository.save(userAccount).getFavoriteModels();
 
     }
 
@@ -53,13 +53,13 @@ public class FavoriteService {
             userAccount.getFavoriteModels().remove(model);
             accountRepository.save(userAccount);
         }
-        return accountRepository.save(userAccount).getFavoriteModels();
+        return (List<AiModel>) accountRepository.save(userAccount).getFavoriteModels();
     }
 
     // get all favorite models for a user
     public List<AiModel> getFavoriteModelsForUser(Long userId) {
         ClientAccount userAccount = (ClientAccount) accountRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("User with id " + userId + " not found"));
-        return userAccount.getFavoriteModels();
+        return (List<AiModel>) userAccount.getFavoriteModels();
     }
 }

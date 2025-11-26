@@ -40,7 +40,12 @@ import com.aiplus.backend.users.model.User;
 import com.aiplus.backend.users.service.AccountService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+/**
+ * Implementation of the AiModelService interface for managing AI models.
+ */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -63,6 +68,19 @@ public class AiModelServiceImpl implements AiModelService {
     private final AiModelDeveloperService aiModelDeveloperService;
 
     private final AccountService accountService;
+
+    /**
+     * Fetches all AI models with pagination.
+     *
+     * @param pageable pagination information
+     * @return a page of AI model summaries
+     */
+    @Cacheable("models_all")
+    @Override
+    public Page<AiModelSummaryDto> getAllModels(Pageable pageable) {
+        System.out.println(modelRepo.findByVisibility(Visibility.PUBLIC, pageable));
+        return modelRepo.findByVisibility(Visibility.PUBLIC, pageable).map(modelMapper::toSummaryDto);
+    }
 
     /**
      * Fetches an AI model by its ID.
@@ -89,21 +107,11 @@ public class AiModelServiceImpl implements AiModelService {
         return modelMapper.toDto(model);
     }
 
-    @Cacheable("models_all")
-    @Override
-    public Page<AiModelSummaryDto> getAllModels(Pageable pageable) {
-        System.out.println("Fetching all public models with pagination: " + pageable);
-        System.out.println(modelRepo.findByVisibility(Visibility.PUBLIC, pageable));
-        return modelRepo.findByVisibility(Visibility.PUBLIC, pageable).map(modelMapper::toSummaryDto);
-    }
-
     /**
      * Creates a new AI model.
      */
     @Override
     public AiModelDto createModel(User user, AiModelCreateDto dto) {
-        System.out.println("Creating model with name: " + dto.getName());
-        System.out.println("DTO Details: " + dto);
 
         if (modelRepo.existsByName(dto.getName())) {
             throw new AiModelNameAlreadyExistsException(dto.getName());
@@ -113,34 +121,26 @@ public class AiModelServiceImpl implements AiModelService {
 
         String dockerPat = developerAccount.getDockerPat();
         String dockerUsername = developerAccount.getDockerUsername();
-        System.out.println("Docker Username: " + dockerUsername);
-        System.out.println("Docker PAT: " + (dockerPat != null ? "******" : "null"));
 
         // checks if the docker image exists
         if (!dockerImageVerifier.existsImage(dockerUsername, dockerPat, dto.getImage())) {
             throw new DockerImageNotFoundException(dto.getImage());
         }
-        logger.log(Level.INFO, "Docker image {0} exists for user {1}", new Object[] { dto.getImage(), dockerUsername });
 
-        logger.log(Level.INFO, "Creating AI model: {0}", dto.getName());
         AiModel model = modelMapper.toEntity(dto);
 
-        logger.log(Level.INFO, "Attaching Developer");
         model.setDeveloperAccount(aiModelAccessControlService.fetchDeveloperAccount(user.getAccount().getId()));
 
-        logger.log(Level.INFO, "Attaching Tasks");
         if (dto.getTasks() != null) {
             model.setTasks(aiModelTaskService.resolveTasks(dto.getTasks()));
         }
 
         // Attach endpoints
-        logger.log(Level.INFO, "Attaching Endpoints : {0}", dto.getEndpoints());
         if (dto.getEndpoints() != null) {
             aiModelEndpointService.attachEndpoints(dto.getEndpoints(), model);
         }
 
         // Attach subscription plans
-        logger.log(Level.INFO, "Attaching Subscription Plans : " + dto.getSubscriptionPlans());
         if (dto.getSubscriptionPlans() != null) {
 
             aiModelSubscriptionPlanService.attachSubscriptionPlans(dto.getSubscriptionPlans(), model);
@@ -152,8 +152,6 @@ public class AiModelServiceImpl implements AiModelService {
         stats.setStars(0);
         stats.setUsed(0);
         model.setStats(stats);
-
-        logger.log(Level.INFO, "Saving AI Model ...");
 
         AiModel saved = modelRepo.save(model);
         logger.log(Level.INFO, "Model " + saved.getName() + " Saved Successfully !");

@@ -13,6 +13,11 @@ public class PaymentExceptionHandler {
         return new ResponseEntity<>(ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(PaymentInitializationException.class)
+    public ResponseEntity<String> handlePaymentInitializationException(PaymentInitializationException ex) {
+        return new ResponseEntity<>("Payment initialization error: " + ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> handleGeneralException(Exception ex) {
         return new ResponseEntity<>("An unexpected error occurred: " + ex.getMessage(),

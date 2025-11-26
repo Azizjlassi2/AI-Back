@@ -17,8 +17,9 @@ import com.aiplus.backend.config.FrontendProperties;
 import com.aiplus.backend.email.service.EmailService;
 import com.aiplus.backend.email.strategy.EmailType;
 import com.aiplus.backend.users.model.User;
-import com.aiplus.backend.users.service.UserService;
+import com.aiplus.backend.users.repository.UserRepository;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -26,14 +27,17 @@ import lombok.RequiredArgsConstructor;
 public class PasswordResetServiceImpl implements PasswordResetService {
 
     private final PasswordResetTokenRepository tokenRepository;
-    private final UserService userService;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final FrontendProperties frontendProperties;
 
     @Override
+    @Transactional
     public void initiateReset(String email) {
-        User user = userService.findByEmail(email);
+
+        System.out.println("Initiating password reset for email: " + email);
+        User user = userRepository.findByEmail(email);
         if (user == null) {
             throw new UserNotFoundException("User not found");
         }
@@ -42,7 +46,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         PasswordResetToken token = PasswordResetTokenFactory.createTokenForUser(user);
         tokenRepository.save(token);
 
-        String resetUrl = frontendProperties.getUrl() + "/reset-password?token=" + token.getToken();
+        String resetUrl = frontendProperties.getUrl() + "/#/reset-password?token=" + token.getToken();
 
         emailService.sendEmail(EmailType.PASSWORD_RESET, user.getEmail(), resetUrl);
     }
@@ -58,16 +62,17 @@ public class PasswordResetServiceImpl implements PasswordResetService {
 
         User user = token.getUser();
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        userService.saveUser(user);
+        userRepository.save(user);
         tokenRepository.delete(token);
     }
 
     @Override
+    @Transactional
     public void updatePassword(User user, PasswordUpdateRequest request) {
 
         if (passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-            userService.saveUser(user);
+            userRepository.save(user);
         } else {
             throw new InvalidCredentialsException("Mot de passe Incorrect !");
         }

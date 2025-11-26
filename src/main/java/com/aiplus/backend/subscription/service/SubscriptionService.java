@@ -1,28 +1,50 @@
 package com.aiplus.backend.subscription.service;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.aiplus.backend.payment.dto.KonnectPaymentInitResponse;
+import com.aiplus.backend.payment.exception.PaymentInitializationException;
 import com.aiplus.backend.payment.model.PaymentStatus;
 import com.aiplus.backend.payment.service.PaymentService;
 import com.aiplus.backend.subscription.dto.SubscriptionCreateDTO;
+import com.aiplus.backend.subscription.dto.SubscriptionDTO;
+import com.aiplus.backend.subscription.dto.SubscriptionDetailsDTO;
+import com.aiplus.backend.subscription.mapper.SubscriptionMapper;
 import com.aiplus.backend.subscription.model.Subscription;
 import com.aiplus.backend.subscription.model.SubscriptionStatus;
 import com.aiplus.backend.subscription.repository.SubscriptionRepository;
+import com.aiplus.backend.subscriptionPlans.exceptions.SubscriptionPlanNotFoundException;
 import com.aiplus.backend.subscriptionPlans.model.SubscriptionPlan;
 import com.aiplus.backend.subscriptionPlans.repository.SubscriptionPlanRepository;
+import com.aiplus.backend.users.exceptions.AccountNotFoundException;
+import com.aiplus.backend.users.exceptions.ClientAccountNotFoundException;
+import com.aiplus.backend.users.model.Account;
+import com.aiplus.backend.users.model.ClientAccount;
 import com.aiplus.backend.users.model.User;
-import com.aiplus.backend.users.repository.UserRepository;
+import com.aiplus.backend.users.repository.AccountRepository;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Service class for managing subscriptions. This class will handle business
- * logic related to subscriptions, such as creating, updating, and retrieving
+ * Service class for managing subscriptions. This class handles business logic
+ * related to subscriptions, including creation, activation, and retrieval of
  * subscription details.
+ * 
+ * <p>
+ * Key responsibilities:
+ * <ul>
+ * <li>Validate client accounts and subscription plans</li>
+ * <li>Create and initialize subscription records with payment initiation</li>
+ * <li>Activate subscriptions upon successful payment</li>
+ * <li>Retrieve subscription details by payment reference</li>
+ * </ul>
+ * </p>
  */
 @Service
 @Slf4j
@@ -31,66 +53,112 @@ public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
-    private final UserRepository userRepository;
+    private final ApiKeyService apiKeyService;
+    private final AccountRepository accountRepository;
     private final PaymentService paymentService;
+    private final SubscriptionMapper subscriptionMapper;
+
+    public List<SubscriptionDTO> getSubscriptionsByClient(User user) {
+
+        Account account = accountRepository.findById(user.getAccount().getId())
+                .orElseThrow(() -> new AccountNotFoundException("Account not found: " + user.getAccount().getId()));
+
+        if (!(account instanceof ClientAccount)) {
+            throw new IllegalArgumentException("Account is not a ClientAccount");
+        }
+
+        ClientAccount clientAccount = (ClientAccount) account;
+
+        List<Subscription> subscriptions = subscriptionRepository.findByClient(clientAccount);
+
+        // Map entities to DTOs
+        return subscriptions.stream().map(subscriptionMapper::toDto).toList();
+    }
 
     /**
      * Creates a new subscription for a client to a specific subscription plan.
+     * 
      * <p>
      * This method performs the following steps:
-     * <ul>
-     * <li>Validates that the provided clientId corresponds to a ClientAccount.</li>
-     * <li>Retrieves the subscription plan and associated AI model and
-     * developer.</li>
-     * <li>Initializes a new Subscription in PENDING status and saves it.</li>
-     * <li>Initiates a payment for the subscription (stubbed for extension).</li>
-     * <li>Links the payment to the subscription and updates the subscription
-     * record.</li>
-     * </ul>
+     * <ol>
+     * <li>Validates that the provided clientId corresponds to a valid
+     * ClientAccount</li>
+     * <li>Retrieves and validates the subscription plan</li>
+     * <li>Initializes a new Subscription in PENDING status</li>
+     * <li>Persists the subscription entity</li>
+     * <li>Initiates payment processing for the subscription</li>
+     * <li>Associates the payment with the subscription</li>
+     * </ol>
+     * </p>
      *
-     * @param dto the DTO containing clientId, planId, recurring flag, and webhook
-     *            URL
-     * @return the created Subscription entity
-     * @throws IllegalArgumentException if clientId is invalid or not a
-     *                                  ClientAccount
+     * @param dto the DTO containing clientId, planId, recurring flag, and customer
+     *            contact information
+     * @return the Konnect payment initialization response containing payment URL
+     *         and reference
+     * @throws ClientAccountNotFoundException    if the provided clientId does not
+     *                                           correspond to a valid ClientAccount
+     * @throws SubscriptionPlanNotFoundException if the provided planId does not
+     *                                           exist in the system
+     * @throws PaymentInitializationException    if payment gateway initialization
+     *                                           fails
+     * @throws IllegalArgumentException          if required DTO fields are null or
+     *                                           invalid
      */
-    public String createSubscription(SubscriptionCreateDTO dto) {
-        log.info("Creating subscription for clientId: {}, planId: {} ,modelName: {} , paymentMethod: {} , planName: {}",
-                dto.getClientId(), dto.getPlanId(), dto.getModelName(), dto.getPaymentMethod(), dto.getPlanName());
+    @Transactional
+    public KonnectPaymentInitResponse createSubscription(SubscriptionCreateDTO dto) {
 
-        User client = userRepository.findById(dto.getClientId())
-                .orElseThrow(() -> new IllegalArgumentException("Client not found"));
+        // Validate input DTO
+        validateSubscriptionCreateDTO(dto);
 
-        if (!client.isClient()) {
-            throw new IllegalArgumentException("User must be a client");
+        log.info("Initiating subscription creation - Model: {}, Plan: {}, ClientId: {}", dto.getModelName(),
+                dto.getPlanName(), dto.getClientId());
+
+        try {
+            // Validate and retrieve the client account
+            ClientAccount client = findAndValidateClientAccount(dto.getClientId());
+            log.debug("Client account validated: {}", client.getId());
+
+            // Validate and retrieve the subscription plan with its model
+            SubscriptionPlan plan = subscriptionPlanRepository.findById(dto.getPlanId()).orElseThrow(() -> {
+                log.warn("Subscription plan not found - PlanId: {}, PlanName: {}", dto.getPlanId(), dto.getPlanName());
+                return new SubscriptionPlanNotFoundException("Subscription plan not found: " + dto.getPlanName());
+            });
+            log.debug("Subscription plan retrieved: {}, Price: {}", plan.getId(), plan.getPrice());
+
+            // Build and persist the subscription entity
+            Subscription subscription = Subscription.builder().client(client).plan(plan).startDate(LocalDate.now())
+                    .status(SubscriptionStatus.PENDING).build();
+
+            subscription = subscriptionRepository.save(subscription);
+            log.info("Subscription entity created - SubscriptionId: {}, Status: {}", subscription.getId(),
+                    subscription.getStatus());
+
+            // géneration d'un clé api pour ce abonnement
+            apiKeyService.createForSubscription(subscription);
+
+            // Initiate payment processing
+            KonnectPaymentInitResponse paymentResponse = paymentService.initiatePaymentForSubscription(subscription,
+                    dto);
+            log.info("Payment initiated successfully - SubscriptionId: {}, PaymentRef: {}", subscription.getId(),
+                    paymentResponse.getPaymentRef());
+
+            return paymentResponse;
+
+        } catch (ClientAccountNotFoundException | SubscriptionPlanNotFoundException e) {
+            // Log validation errors and rethrow
+            log.error("Validation error during subscription creation: {}", e.getMessage());
+            throw e;
+        } catch (PaymentInitializationException e) {
+            // Log payment errors
+            log.error("Payment initialization failed for subscription creation: {}", e.getMessage());
+            // Subscription is already persisted; payment failed. Consider retry strategy or
+            // cleanup.
+            throw e;
+        } catch (Exception e) {
+            // Unexpected errors
+            log.error("Unexpected error during subscription creation", e);
+            throw new RuntimeException("Subscription creation failed: " + e.getMessage(), e);
         }
-
-        // Validate plan
-        SubscriptionPlan plan = subscriptionPlanRepository.findById(dto.getPlanId())
-                .orElseThrow(() -> new IllegalArgumentException("Plan not found"));
-
-        // Link developer from plan.model
-        var model = plan.getModel();
-        var developer = model.getDeveloperAccount();
-
-        Subscription subscription = Subscription.builder().client(client).plan(plan).developer(developer)
-                .startDate(LocalDate.now()) // will be updated on activation
-                .status(SubscriptionStatus.PENDING).recurring(false).build();
-        subscriptionRepository.save(subscription);
-
-        log.info("Subscription Initialized !");
-
-        // Initiate payment. PaymentService returns the payUrl (frontend redirect)
-        String payUrl = paymentService.initiatePaymentForSubscription(subscription);
-
-        log.info("Payment initiated, payUrl: {}", payUrl);
-        // In a controller you will return { subscriptionId, payUrl } to the frontend.
-        return payUrl;
-
-    }
-
-    public Subscription updateSubscription(Subscription subscription) {
-        return subscriptionRepository.save(subscription);
     }
 
     /**
@@ -106,8 +174,54 @@ public class SubscriptionService {
         return subscription;
     }
 
-    public Optional<Subscription> getSubscriptionById(Long id) {
-        return subscriptionRepository.findById(id);
+    public SubscriptionDetailsDTO getSubscriptionByPaymentRef(String id) {
+        Optional<Subscription> subscription = subscriptionRepository.findByPaymentGatewayTransactionId(id);
+        if (subscription.isPresent()) {
+            log.info("Subscription Found :" + subscription);
+            return subscriptionMapper.toDetailsDto(subscription.get());
+        }
+        log.info("No Subscription Found !");
+        return null;
+    }
+
+    /**
+     * Validates the provided SubscriptionCreateDTO for required fields.
+     *
+     * @param dto the DTO to validate
+     * @throws IllegalArgumentException if any required field is null
+     */
+    private void validateSubscriptionCreateDTO(SubscriptionCreateDTO dto) {
+        if (dto == null) {
+            throw new IllegalArgumentException("SubscriptionCreateDTO cannot be null");
+        }
+        if (dto.getClientId() == null) {
+            throw new IllegalArgumentException("Client ID cannot be null");
+        }
+        if (dto.getPlanId() == null) {
+            throw new IllegalArgumentException("Plan ID cannot be null");
+        }
+        if (dto.getEmail() == null || dto.getEmail().trim().isEmpty()) {
+            throw new IllegalArgumentException("Email cannot be null or empty");
+        }
+        log.debug("SubscriptionCreateDTO validation passed");
+    }
+
+    /**
+     * Finds and validates a ClientAccount by ID, ensuring it is a valid
+     * ClientAccount type.
+     *
+     * @param clientId the client account ID
+     * @return the validated ClientAccount
+     * @throws ClientAccountNotFoundException if the account does not exist or is
+     *                                        not a ClientAccount
+     */
+    private ClientAccount findAndValidateClientAccount(Long clientId) {
+        return accountRepository.findById(clientId).filter(ClientAccount.class::isInstance)
+                .map(ClientAccount.class::cast).orElseThrow(() -> {
+                    log.warn("Client account not found or is not ClientAccount type - ClientId: {}", clientId);
+                    return new ClientAccountNotFoundException(
+                            "Invalid client ID or account is not a ClientAccount: " + clientId);
+                });
     }
 
 }

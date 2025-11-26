@@ -1,20 +1,24 @@
 package com.aiplus.backend.payment.gateways;
 
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import com.aiplus.backend.config.FrontendProperties;
-import com.aiplus.backend.payment.model.Payment;
+import com.aiplus.backend.payment.dto.KonnectPaymentInitRequest;
+import com.aiplus.backend.payment.dto.KonnectPaymentInitResponse;
+import com.aiplus.backend.payment.exception.PaymentInitializationException;
 
 import lombok.RequiredArgsConstructor;
 
@@ -39,40 +43,46 @@ public class KonnectClientGateway {
 
     private final RestTemplate rest = new RestTemplate();
 
-    private final FrontendProperties frontendProperties;
-
-    /**
-     * Initiate a payment request to Konnect
-     * 
-     */
-    public Map<String, Object> initPayment(String receiverWalletId, long amountInMillimes, Payment payment,
-            String description) {
-
-        String successUrl = frontendProperties.getUrl() + "/client/subscriptions/"; // TODO: make configurable
+    public KonnectPaymentInitResponse initPayment(KonnectPaymentInitRequest request) {
         String url = konnectApiUrl + "/payments/init-payment";
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("x-api-key", apiKey);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("receiverWalletId", receiverWalletId);
-        body.put("token", "TND"); // or dynamic
-        body.put("amount", amountInMillimes); // in millimes
-        body.put("orderId", payment.getOrderId());
-        body.put("acceptedPaymentMethods", List.of("wallet", "bank_card", "e-DINAR"));
-        body.put("webhook", konnectWebhookUrl);
-        body.put("silentWebhook", true);
-        body.put("description", description);
-        body.put("successUrl", successUrl);
+        HttpEntity<KonnectPaymentInitRequest> entity = new HttpEntity<>(request, headers);
 
-        body.put("firstName", payment.getUser().getName());
-        body.put("email", payment.getUser().getEmail());
+        try {
+            ResponseEntity<Map<String, Object>> response = rest.exchange(url, HttpMethod.POST, entity,
+                    new ParameterizedTypeReference<Map<String, Object>>() {
+                    });
 
-        HttpEntity<Map<String, Object>> req = new HttpEntity<>(body, headers);
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new PaymentInitializationException(
+                        "Konnect API returned non-success status: " + response.getStatusCode());
+            }
 
-        ResponseEntity<Map> resp = rest.postForEntity(url, req, Map.class);
-        return resp.getBody();
+            Map<String, Object> body = response.getBody();
+            if (body == null || body.isEmpty()) {
+                throw new PaymentInitializationException("Konnect API response body is empty");
+            }
+
+            KonnectPaymentInitResponse konnectResponse = KonnectPaymentInitResponse.builder()
+                    .paymentRef((String) body.get("paymentRef")).payUrl((String) body.get("payUrl")).build();
+
+            return konnectResponse;
+
+        } catch (HttpClientErrorException e) {
+            throw new PaymentInitializationException("Client error while calling Konnect API: " + e.getStatusCode()
+                    + " - " + e.getResponseBodyAsString(), e);
+        } catch (HttpServerErrorException e) {
+            throw new PaymentInitializationException(
+                    "Server error from Konnect API: " + e.getStatusCode() + " - " + e.getResponseBodyAsString(), e);
+        } catch (ResourceAccessException e) {
+            throw new PaymentInitializationException("Failed to connect to Konnect API: " + e.getMessage(), e);
+        } catch (PaymentInitializationException | RestClientException e) {
+            throw new PaymentInitializationException("Unexpected error during payment initialization", e);
+        }
     }
 
     /**

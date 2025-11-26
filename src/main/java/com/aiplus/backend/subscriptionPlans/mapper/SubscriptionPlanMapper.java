@@ -10,6 +10,7 @@ import com.aiplus.backend.subscriptionPlans.model.SubscriptionPlan;
 
 @Mapper(componentModel = "spring")
 public interface SubscriptionPlanMapper {
+
     SubscriptionPlanDto toDto(SubscriptionPlan entity);
 
     @Mapping(target = "model", ignore = true)

@@ -1,7 +1,7 @@
 package com.aiplus.backend.users.model;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import com.aiplus.backend.models.model.AiModel;
 
@@ -44,6 +44,6 @@ public class ClientAccount extends Account {
      */
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "client_favorite_models", joinColumns = @JoinColumn(name = "client_id"), inverseJoinColumns = @JoinColumn(name = "model_id"))
-    private List<AiModel> favoriteModels = new ArrayList<>();
+    private Set<AiModel> favoriteModels = new HashSet<>();
 
 }
