@@ -6,6 +6,8 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.aiplus.backend.deployments.model.DeployedInstance;
+import com.aiplus.backend.deployments.service.DeploymentService;
 import com.aiplus.backend.payment.dto.PaymentInitResponse;
 import com.aiplus.backend.payment.exception.PaymentInitializationException;
 import com.aiplus.backend.payment.model.PaymentStatus;
@@ -59,6 +61,8 @@ public class SubscriptionService {
     private final KonnectPaymentService konnectPaymentService;
     private final PaymeePaymentService paymeePaymentService;
     private final SubscriptionMapper subscriptionMapper;
+
+    private final DeploymentService deploymentService;
 
     public List<SubscriptionDTO> getSubscriptionsByClient(User user) {
 
@@ -160,10 +164,19 @@ public class SubscriptionService {
                 && subscription.getPayment().getStatus() == PaymentStatus.COMPLETED) {
             subscription.setStatus(SubscriptionStatus.ACTIVE);
             subscription = subscriptionRepository.save(subscription);
+
+            // Déployez après activation
+            DeployedInstance instance = deploymentService.deployModelForSubscription(subscription);
+
+            // Associez les endpoints du modèle à l'instance (e.g., via baseUrl + path)
+            // Client peut consommer via baseUrl + endpoint.path avec API key
         }
         return subscription;
     }
 
+    /**
+     * Get subscription details by payment reference ID
+     */
     public SubscriptionDetailsDTO getSubscriptionByPaymentRef(String id) {
         Optional<Subscription> subscription = subscriptionRepository.findByPaymentGatewayTransactionId(id);
         if (subscription.isPresent()) {
