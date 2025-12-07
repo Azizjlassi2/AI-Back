@@ -49,16 +49,16 @@ jobs:
         if: github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
         container: ghcr.io/railwayapp/cli:latest
-        env:
-            RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-            RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
 
         steps:
-            - name: Checkout code for deployment
-              uses: actions/checkout@v3
+            - name: Inject Railway Token & Railway Project ID
+              env:
+                  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+                  RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+              run: echo "RAILWAY_TOKEN & RAILWAY_PROJECT_ID is set up."
 
             - name: Trigger Railway Deployment
               run: |
                   export RAILWAY_TOKEN=${{ secrets.RAILWAY_TOKEN }}
                   export RAILWAY_PROJECT=${{ secrets.RAILWAY_PROJECT_ID }}
-                  railway up --service aiplus-backend --detach
+                  railway up --service aiplus-backend
