@@ -25,10 +25,6 @@ jobs:
             - name: Run Tests
               run: mvn test
 
-    docker-build-and-push:
-        needs: build
-        runs-on: ubuntu-latest
-        steps:
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v2
 
@@ -49,17 +45,15 @@ jobs:
                   docker push ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:latest
 
     deploy:
-        needs: docker-build-and-push
+        needs: build
         if: github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v3
-
-            - name: Deploy to Railway
+            - name: Trigger Railway Deployment
               uses: bervProject/railway-deploy@main
               with:
-                  service: aiplus-backend
+                  service: "aiplus-backend"
                   detach: true
               env:
                   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-                  PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+                  RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
