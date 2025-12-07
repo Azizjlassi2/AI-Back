@@ -51,9 +51,9 @@ jobs:
         steps:
             - name: Trigger Railway Deployment
               uses: bervProject/railway-deploy@main
-              with:
-                  service: "aiplus-backend"
-                  detach: true
               env:
                   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
                   RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+              with:
+                  service: "aiplus-backend"
+                  detach: true
