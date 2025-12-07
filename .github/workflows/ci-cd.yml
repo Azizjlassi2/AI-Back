@@ -58,4 +58,7 @@ jobs:
               uses: actions/checkout@v3
 
             - name: Trigger Railway Deployment
-              run: railway up
+              run: |
+                  export RAILWAY_TOKEN=${{ secrets.RAILWAY_TOKEN }}
+                  export RAILWAY_PROJECT=${{ secrets.RAILWAY_PROJECT_ID }}
+                  railway up --service aiplus-backend --detach
