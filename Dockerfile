@@ -10,6 +10,6 @@ RUN mvn clean package -DskipTests  # Skip tests pour build rapide ; activez en C
 FROM amazoncorretto:17-alpine-jdk
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
-ENV SPRING_PROFILES_ACTIVE=prod  # Profil prod pour prod
+ENV SPRING_PROFILES_ACTIVE=prod 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
