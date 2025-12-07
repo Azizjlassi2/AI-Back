@@ -51,6 +51,7 @@ jobs:
         container: ghcr.io/railwayapp/cli:latest
         env:
             RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+            RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
 
         steps:
             - name: Checkout code for deployment
