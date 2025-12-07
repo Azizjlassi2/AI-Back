@@ -1,5 +1,7 @@
 package com.aiplus.backend.subscription.controller;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.aiplus.backend.payment.dto.KonnectPaymentInitResponse;
+import com.aiplus.backend.payment.dto.PaymentInitResponse;
 import com.aiplus.backend.subscription.dto.SubscriptionCreateDTO;
 import com.aiplus.backend.subscription.dto.SubscriptionDTO;
 import com.aiplus.backend.subscription.dto.SubscriptionDetailsDTO;
@@ -20,7 +22,6 @@ import com.aiplus.backend.utils.responses.ApiResponse;
 import com.aiplus.backend.utils.responses.ResponseUtil;
 
 import lombok.RequiredArgsConstructor;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/subscriptions")
@@ -30,9 +31,8 @@ public class SubscriptionController {
     private final SubscriptionService subscriptionService;
 
     @PostMapping("/subscribe")
-    public ResponseEntity<ApiResponse<KonnectPaymentInitResponse>> createSubscription(
-            @RequestBody SubscriptionCreateDTO dto) {
-        KonnectPaymentInitResponse response = subscriptionService.createSubscription(dto);
+    public ResponseEntity<ApiResponse<PaymentInitResponse>> createSubscription(@RequestBody SubscriptionCreateDTO dto) {
+        PaymentInitResponse response = subscriptionService.createSubscription(dto);
         return ResponseEntity.ok(ResponseUtil.success("Subscription created", response));
     }
 

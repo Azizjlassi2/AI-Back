@@ -58,6 +58,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/subscriptions").authenticated()
 
                         .requestMatchers("/api/v1/subscriptions/{payment_ref}").permitAll()
+                        .requestMatchers("/api/v1/developer/**").hasRole("DEVELOPER")
 
                         // other requests
                         .anyRequest().authenticated());

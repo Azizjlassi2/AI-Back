@@ -51,6 +51,13 @@ public class KonnectClientGateway {
         headers.set("x-api-key", apiKey);
 
         HttpEntity<KonnectPaymentInitRequest> entity = new HttpEntity<>(request, headers);
+        System.out.println("Initiating payment with request: " + request);
+        System.out.println("Using API key: " + apiKey);
+        System.out.println("Using Konnect API URL: " + konnectApiUrl);
+        System.out.println("Using frontend URL: " + frontendUrl);
+        System.out.println("Using Konnect webhook URL: " + konnectWebhookUrl);
+        System.out.println("Initiating payment with URL: " + url);
+        System.out.println("Request entity: " + entity);
 
         try {
             ResponseEntity<Map<String, Object>> response = rest.exchange(url, HttpMethod.POST, entity,

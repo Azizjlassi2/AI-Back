@@ -2,8 +2,10 @@ package com.aiplus.backend.models.services.impl;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
@@ -15,9 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.aiplus.backend.docker.exceptions.DockerImageNotFoundException;
 import com.aiplus.backend.docker.service.DockerImageVerifier;
+import com.aiplus.backend.endpoints.dto.EndpointDto;
+import com.aiplus.backend.endpoints.model.Endpoint;
 import com.aiplus.backend.models.dto.AiModelCreateDto;
 import com.aiplus.backend.models.dto.AiModelDto;
 import com.aiplus.backend.models.dto.AiModelSummaryDto;
+import com.aiplus.backend.models.dto.TaskDto;
 import com.aiplus.backend.models.exceptions.AiModelNameAlreadyExistsException;
 import com.aiplus.backend.models.exceptions.AiModelNotFoundException;
 import com.aiplus.backend.models.exceptions.ModelAccessDeniedException;
@@ -26,6 +31,7 @@ import com.aiplus.backend.models.mapper.ModelStatsMapper;
 import com.aiplus.backend.models.mapper.PerformanceMetricsMapper;
 import com.aiplus.backend.models.model.AiModel;
 import com.aiplus.backend.models.model.ModelStats;
+import com.aiplus.backend.models.model.Task;
 import com.aiplus.backend.models.model.Visibility;
 import com.aiplus.backend.models.repository.AiModelRepository;
 import com.aiplus.backend.models.security.AiModelSecurityService;
@@ -35,6 +41,8 @@ import com.aiplus.backend.models.services.helper.AiModelDeveloperService;
 import com.aiplus.backend.models.services.helper.AiModelEndpointService;
 import com.aiplus.backend.models.services.helper.AiModelSubscriptionPlanService;
 import com.aiplus.backend.models.services.helper.AiModelTaskService;
+import com.aiplus.backend.subscriptionPlans.dto.SubscriptionPlanDto;
+import com.aiplus.backend.subscriptionPlans.model.SubscriptionPlan;
 import com.aiplus.backend.users.model.DeveloperAccount;
 import com.aiplus.backend.users.model.User;
 import com.aiplus.backend.users.service.AccountService;
@@ -169,7 +177,7 @@ public class AiModelServiceImpl implements AiModelService {
     /**
      * Updates an existing AI model.
      */
-    @Transactional(rollbackFor = Exception.class)
+    @Transactional
     @CachePut(value = "models_all")
     @Override
     public AiModelDto updateModel(Long id, AiModelDto dto) {
@@ -187,27 +195,59 @@ public class AiModelServiceImpl implements AiModelService {
         existingModel.setVisibility(dto.getVisibility());
 
         // Update tasks
-        logger.log(Level.INFO, "Attaching Tasks");
+        logger.info("Attaching Tasks");
         if (dto.getTasks() != null && !dto.getTasks().isEmpty()) {
-            existingModel.getTasks().clear();
-            existingModel.getTasks().addAll(aiModelTaskService.resolveTasks(dto.getTasks()));
+            // Synchronize: Remove tasks not in DTO, add/update those in DTO
+            Set<Long> newTaskIds = dto.getTasks().stream().filter(d -> d.getId() != null).map(TaskDto::getId)
+                    .collect(Collectors.toSet());
+
+            // Detach unreferenced tasks (no deletion)
+            existingModel.getTasks().removeIf(task -> !newTaskIds.contains(task.getId()));
+
+            // Resolve (update/create) and add new ones
+            List<Task> updatedTasks = aiModelTaskService.resolveTasks(dto.getTasks());
+            updatedTasks.stream().filter(task -> task.getId() == null || !newTaskIds.contains(task.getId())) // New or
+                                                                                                             // mismatched
+                    .forEach(existingModel.getTasks()::add);
         }
 
         // Attach endpoints
-        logger.log(Level.INFO, "Attaching Endpoints");
+        logger.info("Attaching Endpoints");
         if (dto.getEndpoints() != null && !dto.getEndpoints().isEmpty()) {
-            existingModel.getEndpoints().clear();
-            existingModel.getEndpoints()
-                    .addAll(aiModelEndpointService.attachEndpoints(dto.getEndpoints(), existingModel));
+            // Synchronize: Remove endpoints not in DTO, add/update those in DTO
+            Set<Long> newEndpointIds = dto.getEndpoints().stream().filter(d -> d.getId() != null)
+                    .map(EndpointDto::getId).collect(Collectors.toSet());
+
+            // Detach unreferenced endpoints (no deletion)
+            existingModel.getEndpoints().removeIf(endpoint -> !newEndpointIds.contains(endpoint.getId()));
+
+            // Attach (update/create) and add new ones
+            List<Endpoint> updatedEndpoints = aiModelEndpointService.attachEndpoints(dto.getEndpoints(), existingModel);
+            updatedEndpoints.stream()
+                    .filter(endpoint -> endpoint.getId() == null || !newEndpointIds.contains(endpoint.getId())) // New
+                                                                                                                // or
+                                                                                                                // mismatched
+                    .forEach(existingModel.getEndpoints()::add);
         }
-
         // Attach subscription plans
-
         logger.log(Level.INFO, "Attaching Subscription Plans");
+
         if (dto.getSubscriptionPlans() != null && !dto.getSubscriptionPlans().isEmpty()) {
-            existingModel.getSubscriptionPlans().clear();
-            existingModel.getSubscriptionPlans().addAll(
-                    aiModelSubscriptionPlanService.attachSubscriptionPlans(dto.getSubscriptionPlans(), existingModel));
+            // Synchronize: Remove plans not in DTO, add/update those in DTO
+            Set<Long> newPlanIds = dto.getSubscriptionPlans().stream().filter(d -> d.getId() != null)
+                    .map(SubscriptionPlanDto::getId).collect(Collectors.toSet());
+
+            // Remove detached plans (but do NOT delete if referenced; just detach from
+            // model)
+            existingModel.getSubscriptionPlans().removeIf(plan -> !newPlanIds.contains(plan.getId()));
+
+            // Add/update the new/updated ones
+            List<SubscriptionPlan> updatedPlans = aiModelSubscriptionPlanService
+                    .attachSubscriptionPlans(dto.getSubscriptionPlans(), existingModel);
+            // Add only new ones (avoid duplicates for updates)
+            updatedPlans.stream().filter(plan -> plan.getId() == null || !newPlanIds.contains(plan.getId())) // New or
+                                                                                                             // mismatched
+                    .forEach(e -> existingModel.getSubscriptionPlans().add(e));
         }
 
         AiModelDto updatedModel = modelMapper.toDto(modelRepo.save(existingModel));

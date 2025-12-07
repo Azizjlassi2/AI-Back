@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.aiplus.backend.models.model.AiModel;
+import com.aiplus.backend.datasets.model.Dataset;
 import com.aiplus.backend.utils.EncryptionUtil;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -117,6 +118,13 @@ public class DeveloperAccount extends Account {
      */
     @OneToMany(mappedBy = "developerAccount", fetch = FetchType.EAGER)
     private List<AiModel> models = new ArrayList<>();
+
+    /**
+     * All datasets created by this developer. owner side is
+     * Dataset.developerAccount
+     */
+    @OneToMany(mappedBy = "developerAccount", fetch = FetchType.EAGER)
+    private List<Dataset> datasets = new ArrayList<>();
 
     public String setDockerUsername(String dockerUsername) {
         return this.docker_username = dockerUsername;

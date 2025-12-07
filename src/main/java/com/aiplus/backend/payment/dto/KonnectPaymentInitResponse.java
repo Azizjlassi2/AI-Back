@@ -8,7 +8,7 @@ import lombok.Data;
 /**
  * Response DTO for Konnect payment initialization
  */
-public class KonnectPaymentInitResponse {
+public class KonnectPaymentInitResponse extends PaymentInitResponse {
     private String paymentRef;
     private String payUrl;
 }

@@ -14,7 +14,8 @@ import com.aiplus.backend.utils.responses.ApiError;
 public class AiModelExceptionHandler {
 
         @ExceptionHandler({ AiModelNotFoundException.class, DeveloperNotFoundException.class,
-                        TaskNotFoundException.class })
+                        TaskNotFoundException.class, SubscriptionPlanNotFoundException.class,
+                        EndpointNotFoundException.class })
         protected ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
                 ApiError apiError = new ApiError(HttpStatus.NOT_FOUND.value(), "Not Found", ex.getMessage(),
                                 Collections.emptyList());
@@ -42,10 +43,4 @@ public class AiModelExceptionHandler {
                 return new ResponseEntity<>(apiError, HttpStatus.FORBIDDEN);
         }
 
-        @ExceptionHandler(Exception.class)
-        protected ResponseEntity<ApiError> handleAll(Exception ex) {
-                ApiError apiError = new ApiError(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal Server Error",
-                                ex.getLocalizedMessage(), Collections.emptyList());
-                return new ResponseEntity<>(apiError, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
 }

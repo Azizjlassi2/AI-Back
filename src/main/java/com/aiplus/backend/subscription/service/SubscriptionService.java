@@ -6,10 +6,11 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
-import com.aiplus.backend.payment.dto.KonnectPaymentInitResponse;
+import com.aiplus.backend.payment.dto.PaymentInitResponse;
 import com.aiplus.backend.payment.exception.PaymentInitializationException;
 import com.aiplus.backend.payment.model.PaymentStatus;
-import com.aiplus.backend.payment.service.PaymentService;
+import com.aiplus.backend.payment.service.KonnectPaymentService;
+import com.aiplus.backend.payment.service.PaymeePaymentService;
 import com.aiplus.backend.subscription.dto.SubscriptionCreateDTO;
 import com.aiplus.backend.subscription.dto.SubscriptionDTO;
 import com.aiplus.backend.subscription.dto.SubscriptionDetailsDTO;
@@ -55,7 +56,8 @@ public class SubscriptionService {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final ApiKeyService apiKeyService;
     private final AccountRepository accountRepository;
-    private final PaymentService paymentService;
+    private final KonnectPaymentService konnectPaymentService;
+    private final PaymeePaymentService paymeePaymentService;
     private final SubscriptionMapper subscriptionMapper;
 
     public List<SubscriptionDTO> getSubscriptionsByClient(User user) {
@@ -105,44 +107,32 @@ public class SubscriptionService {
      *                                           invalid
      */
     @Transactional
-    public KonnectPaymentInitResponse createSubscription(SubscriptionCreateDTO dto) {
+    public PaymentInitResponse createSubscription(SubscriptionCreateDTO dto) {
 
-        // Validate input DTO
+        log.info("Received SubscriptionCreateDTO: {}", dto);
+
         validateSubscriptionCreateDTO(dto);
 
         log.info("Initiating subscription creation - Model: {}, Plan: {}, ClientId: {}", dto.getModelName(),
                 dto.getPlanName(), dto.getClientId());
 
         try {
-            // Validate and retrieve the client account
             ClientAccount client = findAndValidateClientAccount(dto.getClientId());
-            log.debug("Client account validated: {}", client.getId());
+            SubscriptionPlan plan = subscriptionPlanRepository.findById(dto.getPlanId()).orElseThrow(
+                    () -> new SubscriptionPlanNotFoundException("Subscription plan not found: " + dto.getPlanName()));
 
-            // Validate and retrieve the subscription plan with its model
-            SubscriptionPlan plan = subscriptionPlanRepository.findById(dto.getPlanId()).orElseThrow(() -> {
-                log.warn("Subscription plan not found - PlanId: {}, PlanName: {}", dto.getPlanId(), dto.getPlanName());
-                return new SubscriptionPlanNotFoundException("Subscription plan not found: " + dto.getPlanName());
-            });
-            log.debug("Subscription plan retrieved: {}, Price: {}", plan.getId(), plan.getPrice());
-
-            // Build and persist the subscription entity
             Subscription subscription = Subscription.builder().client(client).plan(plan).startDate(LocalDate.now())
                     .status(SubscriptionStatus.PENDING).build();
 
             subscription = subscriptionRepository.save(subscription);
-            log.info("Subscription entity created - SubscriptionId: {}, Status: {}", subscription.getId(),
-                    subscription.getStatus());
 
-            // géneration d'un clé api pour ce abonnement
             apiKeyService.createForSubscription(subscription);
 
-            // Initiate payment processing
-            KonnectPaymentInitResponse paymentResponse = paymentService.initiatePaymentForSubscription(subscription,
-                    dto);
-            log.info("Payment initiated successfully - SubscriptionId: {}, PaymentRef: {}", subscription.getId(),
-                    paymentResponse.getPaymentRef());
-
-            return paymentResponse;
+            return switch (dto.getPaymentMethod()) {
+            case KONNECT -> konnectPaymentService.initiatePaymentForSubscription(subscription, dto);
+            case PAYMEE -> paymeePaymentService.initiatePaymentForSubscription(subscription, dto);
+            default -> throw new IllegalArgumentException("Unsupported payment gateway: " + dto.getPaymentMethod());
+            };
 
         } catch (ClientAccountNotFoundException | SubscriptionPlanNotFoundException e) {
             // Log validation errors and rethrow
@@ -154,7 +144,7 @@ public class SubscriptionService {
             // Subscription is already persisted; payment failed. Consider retry strategy or
             // cleanup.
             throw e;
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             // Unexpected errors
             log.error("Unexpected error during subscription creation", e);
             throw new RuntimeException("Subscription creation failed: " + e.getMessage(), e);

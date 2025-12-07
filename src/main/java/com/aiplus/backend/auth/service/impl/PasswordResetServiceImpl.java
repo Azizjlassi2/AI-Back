@@ -41,12 +41,20 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         if (user == null) {
             throw new UserNotFoundException("User not found");
         }
+        PasswordResetToken token;
+        if (tokenRepository.existsByUser(user)) {
+            System.out.println("Existing token found for user: " + email);
+            tokenRepository.deleteByUser(user);
+            tokenRepository.flush();
+            System.out.println("Deleted existing token for user: " + email);
+            token = PasswordResetTokenFactory.createTokenForUser(user);
+        } else {
+            token = PasswordResetTokenFactory.createTokenForUser(user);
+        }
 
-        tokenRepository.deleteByUser(user);
-        PasswordResetToken token = PasswordResetTokenFactory.createTokenForUser(user);
         tokenRepository.save(token);
 
-        String resetUrl = frontendProperties.getUrl() + "/#/reset-password?token=" + token.getToken();
+        String resetUrl = frontendProperties.getUrl() + "/reset-password?token=" + token.getToken();
 
         emailService.sendEmail(EmailType.PASSWORD_RESET, user.getEmail(), resetUrl);
     }
