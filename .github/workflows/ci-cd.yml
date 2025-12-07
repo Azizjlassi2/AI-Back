@@ -48,12 +48,13 @@ jobs:
         needs: build
         if: github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
+        container: ghcr.io/railwayapp/cli:latest
+        env:
+            RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
         steps:
+            - name: Checkout code for deployment
+              uses: actions/checkout@v3
+
             - name: Trigger Railway Deployment
-              uses: bervProject/railway-deploy@main
-              env:
-                  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-                  RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-              with:
-                  service: "aiplus-backend"
-                  detach: true
+              run: railway up
