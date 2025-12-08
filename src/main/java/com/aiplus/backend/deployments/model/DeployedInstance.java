@@ -42,7 +42,7 @@ public class DeployedInstance {
     private float memoryUsage;
 
     private LocalDateTime deployedAt;
-    private String baseUrl; // URL de l'instance déployée sur Render (e.g., https://model-xyz.onrender.com)
+    private String baseUrl; // URL de l'instance déployée
     private int port; // Port exposé (e.g., 8080)
 
     private int totalRequests;
@@ -53,9 +53,8 @@ public class DeployedInstance {
 
     @ManyToOne
     @JoinColumn(name = "subscription_id")
-    private Subscription subscription; // Lien vers la subscription/client
+    private Subscription subscription;
 
-    // Enum pour status
     public enum InstanceStatus {
         DEPLOYING, RUNNING, STOPPED, ERROR
     }

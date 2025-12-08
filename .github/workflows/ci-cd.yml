@@ -1,64 +1,64 @@
 name: CI/CD Pipeline for AI+ Backend
 
 on:
-    push:
-        branches: [main]
-    pull_request:
-        branches: [main]
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-    build:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v3
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-            - name: Set up JDK 17
-              uses: actions/setup-java@v3
-              with:
-                  java-version: "17"
-                  distribution: "corretto"
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+          distribution: "corretto"
 
-            - name: Build with Maven
-              run: mvn clean package -DskipTests=false
+      - name: Build with Maven
+        run: mvn clean package -DskipTests=false
 
-            - name: Run Tests
-              run: mvn test
+      - name: Run Tests
+        run: mvn test
 
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-            - name: Log in to Docker Hub
-              uses: docker/login-action@v2
-              with:
-                  username: ${{ secrets.DOCKER_USERNAME }}
-                  password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - name: Build Docker Image
-              run: |
-                  docker build -t ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:${{ github.sha }} .
-                  docker tag ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:latest
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:${{ github.sha }} .
+          docker tag ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:${{ github.sha }} ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:latest
 
-            - name: Push Docker Image
-              run: |
-                  docker push ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:${{ github.sha }}
-                  docker push ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:latest
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:${{ github.sha }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/aiplus-backend:latest
 
-    deploy:
-        needs: build
-        if: github.ref == 'refs/heads/main'
-        runs-on: ubuntu-latest
-        container: ghcr.io/railwayapp/cli:latest
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    container: ghcr.io/railwayapp/cli:latest
 
-        steps:
-            - name: Inject Railway Token & Railway Project ID
-              env:
-                  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-                  RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-              run: echo "RAILWAY_TOKEN & RAILWAY_PROJECT_ID is set up."
+    steps:
+      - name: Inject Railway Token & Railway Project ID
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: echo "RAILWAY_TOKEN & RAILWAY_PROJECT_ID is set up."
 
-            - name: Trigger Railway Deployment
-              run: |
-                  export RAILWAY_TOKEN=${{ secrets.RAILWAY_TOKEN }}
-                  export RAILWAY_PROJECT=${{ secrets.RAILWAY_PROJECT_ID }}
-                  railway up --service aiplus-backend
+      - name: Trigger Railway Deployment
+        run: |
+          export RAILWAY_TOKEN=${{ secrets.RAILWAY_TOKEN }}
+          export RAILWAY_PROJECT_ID=${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service aiplus-backend
