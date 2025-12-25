@@ -22,6 +22,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * API Key associated with a subscription.
+ * 
+ */
 @Entity
 @Getter
 @Setter

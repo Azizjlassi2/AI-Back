@@ -18,8 +18,10 @@ import com.aiplus.backend.docker.exceptions.DockerHubApiException;
 import com.aiplus.backend.docker.exceptions.DockerImageNotFoundException;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class DockerImageVerifier {
 
@@ -44,7 +46,8 @@ public class DockerImageVerifier {
 
         try {
             ResponseEntity<Map> resp = restTemplate.exchange(url, HttpMethod.GET, req, Map.class);
-            // si on arrive là, le repo existe
+            log.info("Docker image check response status: {}", resp.getStatusCode());
+            log.debug("Docker image check response body: {}", resp.getBody());
             return resp.getStatusCode() == HttpStatus.OK;
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.NOT_FOUND) {

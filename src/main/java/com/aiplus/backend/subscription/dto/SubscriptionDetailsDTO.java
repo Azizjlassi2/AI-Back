@@ -26,7 +26,9 @@ public class SubscriptionDetailsDTO {
     private PaymentSummaryDTO payment;
 
     private LocalDate startDate;
+
     private SubscriptionStatus status;
+
     private LocalDate nextBillingDate;
 
     private boolean recurring;

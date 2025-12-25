@@ -48,7 +48,7 @@ public class PaymeeClientGateway {
 
             if (!response.getStatusCode().is2xxSuccessful()) {
                 throw new PaymentInitializationException(
-                        "Konnect API returned non-success status: " + response.getStatusCode());
+                        "Paymee API returned non-success status: " + response.getStatusCode());
             }
             PaymeePaymentInitResponse body = response.getBody();
             if (body == null) {
@@ -70,11 +70,6 @@ public class PaymeeClientGateway {
         } catch (PaymentInitializationException | RestClientException e) {
             throw new PaymentInitializationException("Unexpected error during payment initialization", e);
         }
-
-        // For simplicity, assuming request object is ready to be sent
-
-        // PaymeePaymentInitResponse response = rest.postForObject(url, entity,
-        // PaymeePaymentInitResponse.class);
 
     }
 

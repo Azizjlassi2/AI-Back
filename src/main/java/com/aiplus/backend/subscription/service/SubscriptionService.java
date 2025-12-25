@@ -10,13 +10,16 @@ import com.aiplus.backend.deployments.model.DeployedInstance;
 import com.aiplus.backend.deployments.service.DeploymentService;
 import com.aiplus.backend.payment.dto.PaymentInitResponse;
 import com.aiplus.backend.payment.exception.PaymentInitializationException;
+import com.aiplus.backend.payment.factory.PaymentServiceFactory;
 import com.aiplus.backend.payment.model.PaymentStatus;
 import com.aiplus.backend.payment.service.KonnectPaymentService;
 import com.aiplus.backend.payment.service.PaymeePaymentService;
+import com.aiplus.backend.payment.service.PaymentService;
 import com.aiplus.backend.subscription.dto.SubscriptionCreateDTO;
 import com.aiplus.backend.subscription.dto.SubscriptionDTO;
 import com.aiplus.backend.subscription.dto.SubscriptionDetailsDTO;
 import com.aiplus.backend.subscription.mapper.SubscriptionMapper;
+import com.aiplus.backend.subscription.model.ApiKey;
 import com.aiplus.backend.subscription.model.Subscription;
 import com.aiplus.backend.subscription.model.SubscriptionStatus;
 import com.aiplus.backend.subscription.repository.SubscriptionRepository;
@@ -56,11 +59,10 @@ public class SubscriptionService {
 
     private final SubscriptionRepository subscriptionRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
-    private final ApiKeyService apiKeyService;
     private final AccountRepository accountRepository;
-    private final KonnectPaymentService konnectPaymentService;
-    private final PaymeePaymentService paymeePaymentService;
     private final SubscriptionMapper subscriptionMapper;
+    private final PaymentServiceFactory paymentServiceFactory;
+    private final ApiKeyService apiKeyService;
 
     private final DeploymentService deploymentService;
 
@@ -127,16 +129,25 @@ public class SubscriptionService {
 
             Subscription subscription = Subscription.builder().client(client).plan(plan).startDate(LocalDate.now())
                     .status(SubscriptionStatus.PENDING).build();
+            LocalDate nextBillingDateLocalDate = subscription.isRecurring()
+                    ? (plan.getBillingPeriod() == com.aiplus.backend.subscriptionPlans.model.BillingPeriod.MONTHLY
+                            ? LocalDate.now().plusMonths(1)
+                            : LocalDate.now().plusYears(1))
+                    : null;
+            subscription.setNextBillingDate(nextBillingDateLocalDate);
+            subscription = subscriptionRepository.save(subscription);
+
+            ApiKey apiKey = apiKeyService.createForSubscription(subscription);
+            subscription.setApiKey(apiKey);
 
             subscription = subscriptionRepository.save(subscription);
 
-            apiKeyService.createForSubscription(subscription);
+            PaymentInitResponse resp = paymentServiceFactory.getPaymentService(dto.getPaymentMethod())
+                    .initiatePaymentForSubscription(subscription, dto);
 
-            return switch (dto.getPaymentMethod()) {
-            case KONNECT -> konnectPaymentService.initiatePaymentForSubscription(subscription, dto);
-            case PAYMEE -> paymeePaymentService.initiatePaymentForSubscription(subscription, dto);
-            default -> throw new IllegalArgumentException("Unsupported payment gateway: " + dto.getPaymentMethod());
-            };
+            log.info("Payment initiated successfully for subscription id={}, clientId={}, planId={}",
+                    subscription.getId(), client.getId(), plan.getId());
+            return resp;
 
         } catch (ClientAccountNotFoundException | SubscriptionPlanNotFoundException e) {
             // Log validation errors and rethrow
@@ -170,6 +181,7 @@ public class SubscriptionService {
 
             // Associez les endpoints du modèle à l'instance (e.g., via baseUrl + path)
             // Client peut consommer via baseUrl + endpoint.path avec API key
+            log.info("Subscription activated and model deployed: {}", instance);
         }
         return subscription;
     }

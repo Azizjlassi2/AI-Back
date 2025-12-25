@@ -29,11 +29,10 @@ import com.aiplus.backend.subscription.model.Subscription;
 import com.aiplus.backend.subscription.model.SubscriptionStatus;
 import com.aiplus.backend.subscription.repository.SubscriptionRepository;
 
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-@Service
+@Service("KONNECT")
 @Slf4j
 @RequiredArgsConstructor
 public class KonnectPaymentService implements PaymentService {
@@ -200,48 +199,45 @@ public class KonnectPaymentService implements PaymentService {
          * details from Konnect with retries. - Updates local Payment and Subscription
          * records based on status. - Sends WebSocket notifications to the client about
          * payment result. - Logs all steps and errors for traceability.
+         * 
+         * @Transactional public void handleWebhook(String paymentRef) {
+         *                log.info("Handling webhook for paymentRef={}", paymentRef);
+         * 
+         *                try { Map<String, Object> details = retry(() ->
+         *                konnectClient.getPaymentDetails(paymentRef), 3);
+         *                log.info("Fetched payment details from Konnect: {}", details);
+         * 
+         *                @SuppressWarnings("unchecked") Map<String, Object> paymentData
+         *                = (Map<String, Object>) details.get("payment"); if
+         *                (paymentData == null) { throw new
+         *                IllegalStateException("Payment data missing in Konnect
+         *                response"); }
+         * 
+         *                String konnectStatus = (String) paymentData.get("status"); if
+         *                (konnectStatus == null) { throw new
+         *                IllegalStateException("Status missing in Konnect payment
+         *                data"); }
+         * 
+         *                Payment payment =
+         *                paymentRepository.findByTransactionId(paymentRef).orElseThrow(
+         *                () -> new EntityNotFoundException("Payment not found for ref:
+         *                " + paymentRef));
+         * 
+         *                if ("completed".equalsIgnoreCase(konnectStatus)) {
+         *                updatePaymentToCompleted(payment);
+         *                activateSubscription(payment.getSubscription());
+         *                sendWebSocketSuccessNotification(payment.getSubscription()); }
+         *                else { updatePaymentToFailed(payment);
+         *                sendWebSocketFailureNotification(payment.getSubscription()); }
+         *                } catch (EntityNotFoundException e) { log.error("Entity not
+         *                found during webhook handling for paymentRef={}: {}",
+         *                paymentRef, e.getMessage()); } catch (IllegalStateException e)
+         *                { log.error("Invalid Konnect response for paymentRef={}: {}",
+         *                paymentRef, e.getMessage()); throw e; } catch (Exception e) {
+         *                log.error("Unexpected error handling webhook for
+         *                paymentRef={}", paymentRef, e); throw new
+         *                RuntimeException("Webhook handling failed", e); } }
          */
-        @Transactional
-        public void handleWebhook(String paymentRef) {
-                log.info("Handling webhook for paymentRef={}", paymentRef);
-
-                try {
-                        Map<String, Object> details = retry(() -> konnectClient.getPaymentDetails(paymentRef), 3);
-                        log.info("Fetched payment details from Konnect: {}", details);
-
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> paymentData = (Map<String, Object>) details.get("payment");
-                        if (paymentData == null) {
-                                throw new IllegalStateException("Payment data missing in Konnect response");
-                        }
-
-                        String konnectStatus = (String) paymentData.get("status");
-                        if (konnectStatus == null) {
-                                throw new IllegalStateException("Status missing in Konnect payment data");
-                        }
-
-                        Payment payment = paymentRepository.findByTransactionId(paymentRef).orElseThrow(
-                                        () -> new EntityNotFoundException("Payment not found for ref: " + paymentRef));
-
-                        if ("completed".equalsIgnoreCase(konnectStatus)) {
-                                updatePaymentToCompleted(payment);
-                                activateSubscription(payment.getSubscription());
-                                sendWebSocketSuccessNotification(payment.getSubscription());
-                        } else {
-                                updatePaymentToFailed(payment);
-                                sendWebSocketFailureNotification(payment.getSubscription());
-                        }
-                } catch (EntityNotFoundException e) {
-                        log.error("Entity not found during webhook handling for paymentRef={}: {}", paymentRef,
-                                        e.getMessage());
-                } catch (IllegalStateException e) {
-                        log.error("Invalid Konnect response for paymentRef={}: {}", paymentRef, e.getMessage());
-                        throw e;
-                } catch (Exception e) {
-                        log.error("Unexpected error handling webhook for paymentRef={}", paymentRef, e);
-                        throw new RuntimeException("Webhook handling failed", e);
-                }
-        }
 
         /**
          * Updates the payment status to COMPLETED, sets the completion timestamp, and
@@ -295,5 +291,11 @@ public class KonnectPaymentService implements PaymentService {
                 messagingTemplate.convertAndSendToUser(username, "/payment-updates", update);
                 log.info("Sent WebSocket failure update to user={} for subscriptionId={}", username,
                                 subscription.getId());
+        }
+
+        @Override
+        public void handleWebhook(Map<String, String> obj) {
+                // TODO Auto-generated method stub
+                throw new UnsupportedOperationException("Unimplemented method 'handleWebhook'");
         }
 }

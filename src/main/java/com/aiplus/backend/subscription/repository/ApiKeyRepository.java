@@ -14,6 +14,8 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long> {
 
     Optional<Subscription> findBySubscriptionId(Long subscriptionId);
 
-    List<ApiKey> findAllBySubscriptionClientId(Long id);
+    List<ApiKey> findAllBySubscriptionClientUserId(Long id);
+
+    Optional<ApiKey> findByKeyHash(String hashedKey);
 
 }

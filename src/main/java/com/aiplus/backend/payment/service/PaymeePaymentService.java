@@ -3,6 +3,7 @@ package com.aiplus.backend.payment.service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -12,11 +13,16 @@ import com.aiplus.backend.config.FrontendProperties;
 import com.aiplus.backend.payment.config.PaymeeConfig;
 import com.aiplus.backend.payment.dto.PaymeePaymentInitRequest;
 import com.aiplus.backend.payment.dto.PaymeePaymentInitResponse;
+import com.aiplus.backend.payment.factory.PaymentStatusStrategyFactory;
 import com.aiplus.backend.payment.gateways.PaymeeClientGateway;
 import com.aiplus.backend.payment.model.Payment;
 import com.aiplus.backend.payment.model.PaymentGateway;
 import com.aiplus.backend.payment.model.PaymentStatus;
 import com.aiplus.backend.payment.repository.PaymentRepository;
+import com.aiplus.backend.payment.strategies.PaymentFailedStrategy;
+import com.aiplus.backend.payment.strategies.PaymentPendingStrategy;
+import com.aiplus.backend.payment.strategies.PaymentStatusStrategy;
+import com.aiplus.backend.payment.strategies.PaymentSuccessStrategy;
 import com.aiplus.backend.subscription.dto.SubscriptionCreateDTO;
 import com.aiplus.backend.subscription.model.Subscription;
 import com.aiplus.backend.subscription.repository.SubscriptionRepository;
@@ -27,12 +33,13 @@ import lombok.extern.slf4j.Slf4j;
 
 @RequiredArgsConstructor
 @Slf4j
-@Service
-public class PaymeePaymentService {
+@Service("PAYMEE")
+public class PaymeePaymentService implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final FrontendProperties frontendProperties;
+    private final PaymentStatusStrategyFactory paymentStatusStrategyFactory;
 
     private final PaymeeClientGateway paymeeClientGateway;
     private final PaymeeConfig paymeeConfig;
@@ -74,8 +81,8 @@ public class PaymeePaymentService {
             String orderID) {
 
         String note = buildPaymentDescription(subscription);
-        String successUrl = "https://localhost:5173" + "/client/payment-confirmation";
-        String failureUrl = "https://localhost:5173" + "/client/payment-error/";
+        String successUrl = frontendProperties.getUrl() + "/client/payment-confirmation";
+        String failureUrl = frontendProperties.getUrl() + "/client/payment-error/";
 
         PaymeePaymentInitRequest request = PaymeePaymentInitRequest.builder().note(note).first_name(dto.getFirstName())
                 .last_name(dto.getLastName()).email(dto.getEmail()).phone(dto.getPhoneNumber())
@@ -144,7 +151,10 @@ public class PaymeePaymentService {
         log.info("Paymee payment initiation response: {}", response);
 
         payment.setStatus(PaymentStatus.PROCESSING);
-        payment.setGatewayTransactionId(response.getData().getOrder_id());
+        payment.setGatewayTransactionId(response.getData().getToken());
+
+        log.info(" \nSet gateway transaction ID: {} \n", response.getData().getToken());
+
         paymentRepository.save(payment);
 
         subscription.setPayment(payment);
@@ -157,8 +167,24 @@ public class PaymeePaymentService {
 
     }
 
-    public void handleWebhook(String paymentRef) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    @Transactional
+    @Override
+    public void handleWebhook(Map<String, String> obj) {
+
+        log.info("Handling Paymee webhook with payload: {}", obj);
+
+        String paymentToken = obj.get("token");
+        String status = obj.get("payment_status");
+        if (paymentToken == null || status == null) {
+            log.error("Invalid webhook data: missing token or payment_status");
+            return;
+        }
+        log.info("Processing webhook for payment token: {}, status: {}", paymentToken, status);
+
+        PaymentStatusStrategy strategy = paymentStatusStrategyFactory.get(status);
+
+        strategy.process(paymentToken, (Map) obj);
+
     }
 
 }

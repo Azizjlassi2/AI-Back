@@ -16,7 +16,7 @@ public class AiModelCreateDto {
     private String name;
     private String description;
 
-    private String image; // docker image URL
+    private String image; // docker image
 
     private Visibility visibility;
     private String framework;

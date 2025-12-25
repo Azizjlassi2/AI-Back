@@ -51,17 +51,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/users/*").permitAll() // only for debugging
 
                         .requestMatchers("/api/v1/tasks").permitAll().requestMatchers("/api/v1/models").permitAll()
-                        .requestMatchers("/api/v1/models/{id}").permitAll()
+                        .requestMatchers("/api/v1/models/{id}").permitAll().requestMatchers("/v1/models/**").permitAll()
                         .requestMatchers("/api/v1/models/developer/{id}").permitAll()
                         .requestMatchers("/api/v1/contact/us").authenticated().requestMatchers("/api/v1/models/publish")
-                        .hasRole("DEVELOPER").requestMatchers("/api/v1/payments/webhook").permitAll()
+                        .hasRole("DEVELOPER").requestMatchers("/api/v1/payments/**").permitAll()
                         .requestMatchers("/api/v1/subscriptions").authenticated()
 
-                        .requestMatchers("/api/v1/subscriptions/{payment_ref}").permitAll()
-                        .requestMatchers("/api/v1/developer/**").hasRole("DEVELOPER")
-
-                        // other requests
-                        .anyRequest().authenticated());
+                        .requestMatchers("/api/v1/subscriptions/**").permitAll().requestMatchers("/api/v1/developer/**")
+                        .hasRole("DEVELOPER").requestMatchers("/api/v1/deployments/**").permitAll().anyRequest()
+                        .authenticated());
 
         // Add JWT token filter
         http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);

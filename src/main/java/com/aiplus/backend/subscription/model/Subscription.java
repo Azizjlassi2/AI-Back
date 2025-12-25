@@ -2,7 +2,9 @@ package com.aiplus.backend.subscription.model;
 
 import java.time.LocalDate;
 
+import com.aiplus.backend.deployments.model.DeployedInstance;
 import com.aiplus.backend.payment.model.Payment;
+import com.aiplus.backend.subscriptionPlans.model.BillingPeriod;
 import com.aiplus.backend.subscriptionPlans.model.SubscriptionPlan;
 import com.aiplus.backend.users.model.ClientAccount;
 
@@ -47,7 +49,7 @@ public class Subscription {
     private SubscriptionPlan plan;
 
     /** Linked payment. */
-    @OneToOne(optional = true, cascade = CascadeType.PERSIST)
+    @OneToOne(optional = false, cascade = CascadeType.PERSIST)
     private Payment payment;
 
     /** Subscription start date. */
@@ -56,9 +58,19 @@ public class Subscription {
     /** Next billing date. */
     private LocalDate nextBillingDate;
 
+    /** Associated API key. */
+    @OneToOne(optional = true, cascade = CascadeType.PERSIST)
+    private ApiKey apiKey;
+
     /** Subscription status (PENDING, ACTIVE, etc.). */
     @Column(nullable = false)
     private SubscriptionStatus status;
+
+    /**
+     * Deployed Instance
+     */
+    @OneToOne(optional = true, cascade = CascadeType.PERSIST)
+    private DeployedInstance deployedInstance;
 
     /** True if recurring. */
     @Column(nullable = false)

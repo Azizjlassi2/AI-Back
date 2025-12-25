@@ -14,7 +14,7 @@ import com.aiplus.backend.models.mapper.AiModelMapper;
 import com.aiplus.backend.payment.mapper.PaymentMapper;
 
 @Mapper(componentModel = "spring", uses = { AccountMapper.class, SubscriptionPlanMapper.class, PaymentMapper.class,
-                AiModelMapper.class })
+                AiModelMapper.class, ApiKeyMapper.class })
 public interface SubscriptionMapper {
 
         @Mappings({ @Mapping(target = "client", source = "client"), @Mapping(target = "plan", source = "plan"),

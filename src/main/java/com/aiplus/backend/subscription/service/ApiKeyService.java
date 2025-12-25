@@ -22,7 +22,7 @@ public class ApiKeyService {
     private final ApiKeyRepository apiKeyRepository;
 
     // Génère une clé en clair (remise au client), stocke le hash
-    public void createForSubscription(Subscription subscription) {
+    public ApiKey createForSubscription(Subscription subscription) {
         // 1) generate strong random token
         byte[] random = new byte[32];
         new SecureRandom().nextBytes(random);
@@ -33,7 +33,7 @@ public class ApiKeyService {
 
         ApiKey apiKey = ApiKey.builder().subscription(subscription).key(key).createdAt(Instant.now()).build();
 
-        apiKeyRepository.save(apiKey);
+        return apiKeyRepository.save(apiKey);
 
     }
 
@@ -47,7 +47,9 @@ public class ApiKeyService {
     }
 
     public List<ApiKey> getApiKeysByClientId(long id) {
-        return apiKeyRepository.findAllBySubscriptionClientId(id);
+        List<ApiKey> apiKeys = apiKeyRepository.findAllBySubscriptionClientUserId(id);
+        System.out.println("Retrieved " + apiKeys.size() + " API keys for client ID " + id);
+        return apiKeys;
 
     }
 }

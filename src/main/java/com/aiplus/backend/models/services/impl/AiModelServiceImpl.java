@@ -120,39 +120,49 @@ public class AiModelServiceImpl implements AiModelService {
      */
     @Override
     public AiModelDto createModel(User user, AiModelCreateDto dto) {
+        log.info("Début de la création du modèle AI pour l'utilisateur {} avec DTO : {}", user.getId(), dto.getName()); // Log
+                                                                                                                        // d'entrée
+                                                                                                                        // avec
+                                                                                                                        // contexte
 
         if (modelRepo.existsByName(dto.getName())) {
+            log.warn("Nom de modèle '{}' déjà existant. Lancement d'exception.", dto.getName());
             throw new AiModelNameAlreadyExistsException(dto.getName());
         }
 
         DeveloperAccount developerAccount = (DeveloperAccount) accountService.findByUser(user);
+        log.info("Compte développeur récupéré pour l'utilisateur {} : ID {}", user.getId(), developerAccount.getId());
 
         String dockerPat = developerAccount.getDockerPat();
         String dockerUsername = developerAccount.getDockerUsername();
 
-        // checks if the docker image exists
+        // Vérification de l'image Docker
+        log.info("Vérification de l'existence de l'image Docker : {}/{}", dockerUsername, dto.getImage());
         if (!dockerImageVerifier.existsImage(dockerUsername, dockerPat, dto.getImage())) {
+            log.error("Image Docker '{}' non trouvée pour l'utilisateur {}.", dto.getImage(), dockerUsername);
             throw new DockerImageNotFoundException(dto.getImage());
         }
+        log.info("Image Docker validée avec succès.");
 
         AiModel model = modelMapper.toEntity(dto);
-
-        model.setDeveloperAccount(aiModelAccessControlService.fetchDeveloperAccount(user.getAccount().getId()));
+        model.setDeveloperAccount(developerAccount);
+        log.info("Modèle AI initialisé avec compte développeur.");
 
         if (dto.getTasks() != null) {
             model.setTasks(aiModelTaskService.resolveTasks(dto.getTasks()));
+            log.info("Tâches attachées au modèle : {}", dto.getTasks());
         }
 
         // Attach endpoints
         if (dto.getEndpoints() != null) {
             aiModelEndpointService.attachEndpoints(dto.getEndpoints(), model);
+            log.info("Endpoints attachés au modèle : nombre = {}", dto.getEndpoints().size());
         }
 
         // Attach subscription plans
         if (dto.getSubscriptionPlans() != null) {
-
             aiModelSubscriptionPlanService.attachSubscriptionPlans(dto.getSubscriptionPlans(), model);
-
+            log.info("Plans d'abonnement attachés au modèle : nombre = {}", dto.getSubscriptionPlans().size());
         }
 
         ModelStats stats = new ModelStats();
@@ -160,9 +170,10 @@ public class AiModelServiceImpl implements AiModelService {
         stats.setStars(0);
         stats.setUsed(0);
         model.setStats(stats);
+        log.info("Statistiques initialisées pour le modèle.");
 
         AiModel saved = modelRepo.save(model);
-        logger.log(Level.INFO, "Model " + saved.getName() + " Saved Successfully !");
+        log.info("Modèle AI '{}' sauvegardé avec succès. ID : {}", saved.getName(), saved.getId());
 
         return modelMapper.toDto(saved);
     }

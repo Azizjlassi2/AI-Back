@@ -1,13 +1,12 @@
 package com.aiplus.backend.deployments.factories;
 
+import org.springframework.stereotype.Component;
+
+import com.aiplus.backend.deployments.strategies.AwsDeploymentStrategy;
 import com.aiplus.backend.deployments.strategies.DeploymentStrategy;
 import com.aiplus.backend.deployments.strategies.RenderDeploymentStrategy;
 
 import lombok.RequiredArgsConstructor;
-
-import com.aiplus.backend.deployments.strategies.AwsDeploymentStrategy;
-
-import org.springframework.stereotype.Component;
 
 @RequiredArgsConstructor
 @Component
